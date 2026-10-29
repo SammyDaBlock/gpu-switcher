@@ -4,7 +4,11 @@ A Windows tray app for PCs with **two (or more) GPUs**. See which GPU every app 
 
 Made for setups like an RTX 5070 for games + an RTX 3060 for Discord, browsers, OBS and other background stuff.
 
-> Screenshots coming soon.
+![GPU Switcher, Running tab](docs/screenshots/running-dark.png)
+
+| Force mode | Settings (light mode) |
+|---|---|
+| ![Force mode tab](docs/screenshots/force-mode-dark.png) | ![Settings tab in light mode](docs/screenshots/settings-light.png) |
 
 ## What it does
 
