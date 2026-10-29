@@ -216,9 +216,13 @@ public partial class MainWindow : Window
         {
             _gpuSignature = sig;
             _cards.Clear();
+            double width = gpus.Count <= 2 ? 250 : gpus.Count == 3 ? 210 : 175;
             foreach (var g in gpus)
-                _cards.Add(new GpuCardVm { Key = g.Key, Name = g.ShortName, Brush = Look.GpuBrush(g.Key), Soft = Look.GpuSoft(g.Key), Badge = g.IsDisplayGpu ? "monitors" : "" });
-            EvacButtons.ItemsSource = gpus.Where(g => !g.IsDisplayGpu).Select(g => new { Label = $"Move everything off {g.ShortName}", g.Key }).ToList();
+                _cards.Add(new GpuCardVm { Key = g.Key, Name = g.ShortName, Brush = Look.GpuBrush(g.Key), Soft = Look.GpuSoft(g.Key), Width = width, Badge = g.IsDisplayGpu ? "monitors" : "" });
+            OneGpuBanner.Visibility = gpus.Count < 2 ? Visibility.Visible : Visibility.Collapsed;
+            var others = gpus.Where(g => !g.IsDisplayGpu).ToList();
+            // with 3+ GPUs there's one button per extra GPU, so keep them short
+            EvacButtons.ItemsSource = others.Select(g => new { Label = others.Count == 1 ? $"Move everything off {g.ShortName}" : $"Move all off {Look.Label(g)}", g.Key }).ToList();
             foreach (var r in _rows) r.Choices = ChoiceVm.Build(r, true);
             if (_filterKey != null && gpus.All(g => g.Key != _filterKey)) _filterKey = null;
             _filter.Choices = ChoiceVm.Build(_filter, true, "All");
@@ -354,7 +358,7 @@ public partial class MainWindow : Window
         var restart = wrong.Except(live).Except(games).Where(x => skipped.All(s => s.App != x.App)).ToList();
 
         string Names(IEnumerable<(RunningApp App, string? Target, LiveKind Kind)> l) =>
-            string.Join(", ", l.Select(x => $"{x.App.DisplayName} → {Gpus.ByKey(x.Target)?.ShortName.Replace("RTX ", "")}"));
+            string.Join(", ", l.Select(x => $"{x.App.DisplayName} → {Look.Label(x.Target)}"));
 
         if (restart.Count > 0)
         {
@@ -810,6 +814,34 @@ public partial class MainWindow : Window
         s.Save();
         RefreshRules();
         Status($"Fortnite added: {hide.ShortName} goes off for a few seconds whenever Fortnite starts.");
+    }
+
+    /// <summary>Force mode for a game that isn't running (the Running tab's Force switch needs it running).</summary>
+    void AddGame_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Pick the game's exe (Unreal Engine games: the ...-Win64-Shipping.exe)",
+            Filter = "Programs|*.exe",
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+        };
+        if (dlg.ShowDialog(this) != true) return;
+        var exe = dlg.FileName;
+        var name = Path.GetFileName(exe);
+        var s = AppSettings.Current;
+        if (s.ForceRules.Any(r => r.GameExe.Equals(name, StringComparison.OrdinalIgnoreCase))) { Status($"{name} is already in the list."); return; }
+        // same choice as the Force switch: the game's GPU (or the monitors' GPU), hide one without monitors
+        var target = Gpus.ByKey(Preferences.GetGpuKey(exe)) ?? Gpus.DisplayGpu;
+        var hide = Gpus.All.FirstOrDefault(g => g.Key != target?.Key && !g.IsDisplayGpu);
+        if (hide == null || target == null) { Dialog.Info("No GPU to hide", "Force mode needs a second GPU without monitors."); return; }
+        var rule = name.StartsWith("FortniteClient", StringComparison.OrdinalIgnoreCase)
+            ? ForceMode.FortnitePreset(hide.Key)
+            : new ForceRule { GameExe = name, Triggers = new() { name }, DisableGpuKey = hide.Key, Label = Apps.FriendlyName(exe) };
+        s.ForceRules.Add(rule);
+        if (Preferences.GetGpuKey(exe) == null) { Preferences.SetGpu(exe, target.Key); AutoAssign.MarkManual(exe); }
+        s.Save();
+        RefreshRules();
+        Status($"Force mode on: next time {rule.Label} starts, {hide.ShortName} goes off until it has picked {target.ShortName}.", 12);
     }
 
     void RemoveRule_Click(object sender, RoutedEventArgs e)

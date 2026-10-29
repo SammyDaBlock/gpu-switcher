@@ -12,6 +12,7 @@ public static class AutoAssign
     static readonly HashSet<string> Skip = new(StringComparer.OrdinalIgnoreCase)
     {
         "GpuSwitcher.exe", "nvcontainer.exe", "NVIDIA Overlay.exe", "NVIDIA app.exe", "NVIDIA Share.exe",
+        "RadeonSoftware.exe", "AMDRSServ.exe", "IGCC.exe", // AMD Adrenalin, Intel Graphics Command Center
         "EasyAntiCheat.exe", "EasyAntiCheat_EOS.exe", "BEService.exe", "vgc.exe",
     };
 

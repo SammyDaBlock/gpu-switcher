@@ -105,11 +105,16 @@ public partial class App : Application
     void ApplyDefaults()
     {
         var s = AppSettings.Current;
+        // Games: the monitors' GPU (desktops plug monitors into the gaming card). Laptops have the screen on the
+        // built-in graphics, so if another GPU has clearly more VRAM (or the monitors' GPU barely has any), use that one.
         var display = Gpus.DisplayGpu;
-        var other = Gpus.All.FirstOrDefault(g => !g.IsDisplayGpu);
+        var biggest = Gpus.All.OrderByDescending(g => g.VramBytes).FirstOrDefault();
+        var games = display != null && biggest != null && (display.VramBytes < 2UL << 30 || biggest.VramBytes >= display.VramBytes * 3 / 2)
+            ? biggest : display ?? biggest;
+        var apps = Gpus.All.FirstOrDefault(g => g.Key != games?.Key);
         bool changed = false;
-        if (s.AutoAppsGpuKey == null && other != null) { s.AutoAppsGpuKey = other.Key; changed = true; }
-        if (s.AutoGamesGpuKey == null && display != null) { s.AutoGamesGpuKey = display.Key; changed = true; }
+        if (s.AutoAppsGpuKey == null && apps != null) { s.AutoAppsGpuKey = apps.Key; changed = true; }
+        if (s.AutoGamesGpuKey == null && games != null) { s.AutoGamesGpuKey = games.Key; changed = true; }
         if (changed) s.Save();
     }
 
@@ -260,8 +265,9 @@ public partial class App : Application
                 if (dlg != null) { CaptureScreen(ScreenRect(dlg, 16), path); dlg.Close(); }
             };
             timer.Start();
-            UI.Dialog.Confirm("Turn RTX 3060 off for 5 seconds?",
-                "Using it right now: Discord, Brave.\n\nApps that can handle it move to RTX 5070. Others may crash or restart. Your monitors stay on.", "Turn it off", "Cancel");
+            var second = Gpus.All.FirstOrDefault(g => !g.IsDisplayGpu)?.ShortName ?? "the second GPU";
+            UI.Dialog.Confirm($"Turn {second} off for 5 seconds?",
+                $"Using it right now: Discord, Brave.\n\nApps that can handle it move to {Gpus.DisplayGpu?.ShortName}. Others may crash or restart. Your monitors stay on.", "Turn it off", "Cancel");
             ExitApp();
             return;
         }
@@ -362,6 +368,28 @@ public partial class App : Application
             case "--launch-test":
                 File.WriteAllText(args[2], Native.LaunchUnelevated(args[1], null, null).ToString());
                 return true;
+
+            // --test-names <out>: how other PCs' GPU names get shortened
+            case "--test-names":
+            {
+                string[][] pcs =
+                {
+                    new[] { "NVIDIA GeForce RTX 5070", "NVIDIA GeForce RTX 3060" },
+                    new[] { "AMD Radeon RX 7900 XTX", "AMD Radeon(TM) Graphics" },
+                    new[] { "NVIDIA GeForce RTX 4070 Laptop GPU", "Intel(R) UHD Graphics 770" },
+                    new[] { "Intel(R) Arc(TM) A770 Graphics", "NVIDIA GeForce GTX 1660 SUPER", "NVIDIA Quadro RTX 4000" },
+                    new[] { "NVIDIA GeForce RTX 3060", "NVIDIA GeForce RTX 3060" },
+                };
+                var sb = new StringBuilder();
+                uint sub = 1;
+                foreach (var pc in pcs)
+                {
+                    var fake = pc.Select(n => new GpuAdapter { Name = n, VendorId = 0x10DE, DeviceId = 1, SubSysId = sub++ }).ToList();
+                    sb.AppendLine(string.Join("   |   ", fake.Select(g => $"{g.Name} -> \"{g.ShortName}\" / \"{UI.Look.Label(g, fake)}\"")));
+                }
+                File.WriteAllText(args[1], sb.ToString());
+                return true;
+            }
 
             // emergency: hand every startup app back to Windows
             case "--restore-startup":

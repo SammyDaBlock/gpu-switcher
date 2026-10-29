@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -42,6 +43,27 @@ public static class Look
         var ordered = Gpus.All.OrderBy(g => g.IsDisplayGpu ? 0 : 1).ToList(); // stable, keeps Windows' order otherwise
         return ordered.FindIndex(g => g.Key == key);
     }
+
+    /// <summary>
+    /// Short GPU name for tight spots (pickers, pills, buttons): "RTX 5070" -> "5070", "Radeon RX 7900 XTX" -> "7900 XTX",
+    /// "UHD Graphics 770" -> "UHD 770". Two cards with the same name get "#1" / "#2".
+    /// </summary>
+    public static string Label(GpuAdapter g) => Label(g, Gpus.All);
+
+    public static string Label(GpuAdapter g, IReadOnlyList<GpuAdapter> all)
+    {
+        static string Compact(GpuAdapter a)
+        {
+            var n = Regex.Replace(a.ShortName, @"\b(RTX|GTX|RX|Radeon|Arc)\s+", "", RegexOptions.IgnoreCase);
+            n = Regex.Replace(n, @"\s*\bGraphics\b", "", RegexOptions.IgnoreCase).Replace("Laptop GPU", "Laptop").Trim();
+            if (n.Length == 0) n = a.ShortName; // "Radeon Graphics" (AMD integrated)
+            return n.Length > 16 ? n[..15] + "…" : n;
+        }
+        var mine = Compact(g);
+        var same = all.Where(x => Compact(x) == mine).ToList();
+        return same.Count < 2 ? mine : $"{mine} #{same.FindIndex(x => x.Key == g.Key) + 1}";
+    }
+    public static string Label(string? key) => Gpus.ByKey(key) is { } g ? Label(g) : "-";
 
     public static Brush GpuBrush(string? key) => Role(key) is var i and >= 0 ? R($"Gpu{i % 4}") : Sub;
     /// <summary>Light tint of the GPU's color for pills and selected cards.</summary>
@@ -86,7 +108,7 @@ public class ChoiceVm : Vm
         var list = new ObservableCollection<ChoiceVm>();
         if (includeAuto) list.Add(new ChoiceVm { Label = autoLabel, Key = null, SelectedBrush = Look.AutoBrush, Owner = owner });
         foreach (var g in Gpus.All)
-            list.Add(new ChoiceVm { Label = g.ShortName.Replace("RTX ", ""), Key = g.Key, SelectedBrush = Look.GpuBrush(g.Key), Owner = owner });
+            list.Add(new ChoiceVm { Label = Look.Label(g), Key = g.Key, SelectedBrush = Look.GpuBrush(g.Key), Owner = owner });
         return list;
     }
 
@@ -108,7 +130,7 @@ public class AppRowVm : Vm
     public ObservableCollection<ChoiceVm> Choices { get => _choices; set => Set(ref _choices, value); }
 
     string? _onKey; public string? OnKey { get => _onKey; set { if (Set(ref _onKey, value)) { Raise(nameof(OnText)); Raise(nameof(OnBrush)); Raise(nameof(OnSoft)); } } }
-    public string OnText => Gpus.ByKey(OnKey)?.ShortName.Replace("RTX ", "").Replace("GTX ", "") ?? "-";
+    public string OnText => Look.Label(OnKey);
     public Brush OnBrush => Look.GpuBrush(OnKey);
     public Brush OnSoft => Look.GpuSoft(OnKey);
 
@@ -127,7 +149,7 @@ public class AppRowVm : Vm
     public string KindText => Kind switch
     {
         LiveKind.Chromium => "Live switch",
-        LiveKind.SurvivesDeviceLoss => $"Live: off {Gpus.All.FirstOrDefault(g => !g.IsDisplayGpu)?.ShortName.Replace("RTX ", "") ?? "2nd GPU"} only",
+        LiveKind.SurvivesDeviceLoss => $"Live: off {(Gpus.All.FirstOrDefault(g => !g.IsDisplayGpu) is { } second ? Look.Label(second) : "2nd GPU")} only",
         LiveKind.CrashesOnDeviceLoss => "Restart only",
         LiveKind.Game => "Game: restart / force",
         _ => "Restart only",
@@ -145,7 +167,7 @@ public class AppRowVm : Vm
     {
         RowAction.SwitchLive => "Switch live",
         RowAction.MoveOffLive => "Move live",
-        RowAction.Restart => "Restart on " + (Gpus.ByKey(PrefKey)?.ShortName.Replace("RTX ", "") ?? "GPU"),
+        RowAction.Restart => "Restart on " + (Gpus.ByKey(PrefKey) is { } g ? Look.Label(g) : "GPU"),
         _ => "",
     };
     public Visibility ActionVisible => Action == RowAction.None || Busy ? Visibility.Collapsed : Visibility.Visible;
@@ -219,6 +241,8 @@ public class GpuCardVm : Vm
     public string Name { get; set; } = "";
     public Brush Brush { get; set; } = Look.Sub;
     public Brush Soft { get; set; } = Brushes.Transparent;
+    /// <summary>Narrower with more GPUs so 3-4 cards still fit next to the title.</summary>
+    public double Width { get; set; } = 250;
     public string Badge { get; set; } = "";
     public Visibility BadgeVisible => string.IsNullOrEmpty(Badge) ? Visibility.Collapsed : Visibility.Visible;
     double _util; public double Util { get => _util; set { if (Set(ref _util, value)) Raise(nameof(UtilText)); } }

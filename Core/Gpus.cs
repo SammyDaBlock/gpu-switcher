@@ -24,8 +24,10 @@ public class GpuAdapter
     {
         get
         {
+            // "NVIDIA GeForce RTX 5070" -> "RTX 5070", "AMD Radeon RX 7900 XTX" -> "Radeon RX 7900 XTX", "Intel(R) UHD Graphics 770" -> "UHD Graphics 770"
             var n = Regex.Replace(Name, @"^(NVIDIA\s+)?(GeForce\s+)?", "", RegexOptions.IgnoreCase);
-            return n.Replace("AMD ", "").Replace("(TM)", "").Trim();
+            n = Regex.Replace(n, @"^(AMD|Intel\(R\)|Intel)\s+", "", RegexOptions.IgnoreCase);
+            return Regex.Replace(n.Replace("(TM)", "").Replace("(R)", ""), @"\s{2,}", " ").Trim();
         }
     }
 
@@ -67,7 +69,7 @@ public static class Gpus
                 foreach (var a in grp) g.Luids.Add(a.Luid);
                 g.VramBytes = grp.Max(a => a.VramBytes);
                 g.PnpId = pnp.FirstOrDefault(p => p.Matches(g.VendorId, g.DeviceId, g.SubSysId))?.PnpId ?? g.PnpId;
-                // DXGI reports every monitor on the GPU this process renders on (so on the 3060 when GpuSwitcher.exe is set to it).
+                // DXGI reports every monitor on the GPU this process renders on (so on the second GPU when GpuSwitcher.exe is set to it).
                 // Ask PnP which card the monitors are actually plugged into; DXGI is only the fallback.
                 g.IsDisplayGpu = g.PnpId != null ? Native.HasMonitors(g.PnpId) : grp.Any(a => a.Outputs > 0);
                 g.IsDisabled = false;

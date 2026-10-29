@@ -1,7 +1,7 @@
 namespace GpuSwitcher.Core;
 
 /// <summary>
-/// When a GPU comes back on (force mode, the Fortnite script, Device Manager...), apps that were bumped off it
+/// When a GPU comes back on (force mode, a script, Device Manager...), apps that were bumped off it
 /// and belong on it go back: Chromium apps live, other apps get restarted. Games are never restarted.
 /// Watches GPU state from the monitor, so it doesn't matter who turned the GPU off.
 /// </summary>

@@ -14,10 +14,11 @@ Made for setups like an RTX 5070 for games + an RTX 3060 for Discord, browsers, 
   - Chromium / Electron apps (Discord, Brave, Chrome, Spotify...) switch **live**: only their GPU process restarts, your tabs and calls stay.
   - Other apps get a one-click **"Restart on GPU X"**.
   - "Move everything off GPU X" turns the second GPU off for ~5 seconds so apps that can handle it move over by themselves.
-- **FORCE mode** for games that ignore every GPU setting (Fortnite / Unreal Engine games pick the GPU with the most VRAM). When the game starts, the other GPU is turned off until the game has picked its GPU, then turned back on. Nothing is injected into the game.
+- **Force mode** for games that ignore every GPU setting (Fortnite / Unreal Engine games pick the GPU with the most VRAM). When the game starts, the other GPU is turned off until the game has picked its GPU, then turned back on. Nothing is injected into the game. Works for any game: add it from the Force mode tab, or flip its Force switch while it runs. Fortnite has a one-click preset.
 - **Auto-assign**: new apps get a default GPU, games get their own.
 - **Startup apps**: GPU Switcher can launch your startup apps itself, after their GPU choice is fixed (also right after they update into a new folder, like Discord).
 - Apps that update into a new version folder keep their GPU choice.
+- Windows 11 look: Mica, follows light/dark mode. The GPU your monitors are on is always blue, the second one orange.
 
 ## Requirements
 
@@ -25,6 +26,12 @@ Made for setups like an RTX 5070 for games + an RTX 3060 for Discord, browsers, 
 - [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) (x64)
 - Two or more GPUs. Only tested on **NVIDIA + NVIDIA** so far. AMD / Intel combos may work but aren't tested. Reports welcome!
 - Admin rights (needed to turn a GPU off for a few seconds and to manage startup apps)
+
+### Known limits
+
+- **Two identical GPUs** (same model *and* same board maker) can't be told apart: Windows stores per-app GPU choices by model, so it can't either. Same model from different brands is fine.
+- **Laptops** (built-in graphics + a gaming GPU) should work but aren't tested. The screen's GPU is never turned off, so force mode can only hide the gaming GPU, not the built-in one.
+- **3+ GPUs:** everything works, but force mode only hides one other GPU while a game starts.
 
 ## Install
 
