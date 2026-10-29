@@ -391,6 +391,32 @@ public partial class App : Application
                 return true;
             }
 
+            // --export-icon <out.ico>: writes the drawn icon as a multi-size .ico (used for the exe and the installer)
+            case "--export-icon":
+            {
+                int[] sizes = { 16, 20, 24, 32, 40, 48, 64, 256 };
+                var pngs = sizes.Select(sz =>
+                {
+                    using var bmp = IconBitmap(sz);
+                    using var ms = new MemoryStream();
+                    bmp.Save(ms, Drawing.Imaging.ImageFormat.Png);
+                    return ms.ToArray();
+                }).ToList();
+                using var fs = File.Create(args[1]);
+                using var w = new BinaryWriter(fs);
+                w.Write((short)0); w.Write((short)1); w.Write((short)sizes.Length); // ICONDIR
+                int offset = 6 + 16 * sizes.Length;
+                for (int i = 0; i < sizes.Length; i++) // ICONDIRENTRY, PNG-compressed images
+                {
+                    w.Write((byte)(sizes[i] >= 256 ? 0 : sizes[i])); w.Write((byte)(sizes[i] >= 256 ? 0 : sizes[i]));
+                    w.Write((byte)0); w.Write((byte)0); w.Write((short)1); w.Write((short)32);
+                    w.Write(pngs[i].Length); w.Write(offset);
+                    offset += pngs[i].Length;
+                }
+                foreach (var p in pngs) w.Write(p);
+                return true;
+            }
+
             // emergency: hand every startup app back to Windows
             case "--restore-startup":
                 StartupManager.GiveBackAll();

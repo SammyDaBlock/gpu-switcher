@@ -11,7 +11,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>GpuSwitcher</AssemblyName>
     <RootNamespace>GpuSwitcher</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <Product>GPU Switcher</Product>
+    <Company>SammyDaBlock</Company>
+    <Description>GPU Switcher</Description>
     <!-- The manifest DPI setting is the right one for WPF; the WinForms analyzer just doesn't know that -->
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

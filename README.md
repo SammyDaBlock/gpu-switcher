@@ -27,7 +27,6 @@ Made for setups like an RTX 5070 for games + an RTX 3060 for Discord, browsers, 
 ## Requirements
 
 - Windows 11, 64-bit (Windows 10 may work, not tested)
-- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) (x64)
 - Two or more GPUs. Only tested on **NVIDIA + NVIDIA** so far. AMD / Intel combos may work but aren't tested. Reports welcome!
 - Admin rights (needed to turn a GPU off for a few seconds and to manage startup apps)
 
@@ -39,11 +38,14 @@ Made for setups like an RTX 5070 for games + an RTX 3060 for Discord, browsers, 
 
 ## Install
 
-1. Download `GpuSwitcher.exe` from [Releases](../../releases).
-2. Put it in `C:\Program Files\GPU Switcher\` (or anywhere you like) and run it.
-3. Optional: Settings → **Start with Windows**. This adds a scheduled task called `GPU Switcher` so it starts in the tray as admin without a UAC prompt.
+1. Download **`GpuSwitcher-Setup.exe`** from [Releases](../../releases/latest).
+2. Open it and click through. That's it, nothing else to install (.NET is included).
 
-Windows SmartScreen may warn about it because the exe isn't code-signed. Click **More info → Run anyway**, or build it yourself (below).
+The installer puts it in `C:\Program Files\GPU Switcher\`, adds a Start Menu shortcut and (if you leave the box ticked) makes it start with Windows in the tray, as admin, without a UAC prompt. Running the installer again updates it.
+
+Windows SmartScreen may warn about it because it isn't code-signed. Click **More info → Run anyway**, or build it yourself (below).
+
+**Uninstall** from Settings → Apps. It closes GPU Switcher, gives any startup apps it took over back to Windows, removes the startup task and makes sure every GPU is on. Your per-app GPU choices stay in Windows (Settings → Display → Graphics).
 
 ## Safety
 
@@ -66,7 +68,9 @@ cd gpu-switcher
 dotnet publish -c Release -o publish
 ```
 
-The exe ends up in `publish\GpuSwitcher.exe`.
+The exe ends up in `publish\GpuSwitcher.exe` (needs the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) to run).
+
+To build the installer too, install [Inno Setup](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`) and run `.\build-release.ps1`. It makes `release\GpuSwitcher-Setup.exe` with .NET included.
 
 ## Files
 
