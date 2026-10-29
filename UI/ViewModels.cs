@@ -20,25 +20,32 @@ public abstract class Vm : INotifyPropertyChanged
         return true;
     }
     protected void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    /// <summary>Re-read every binding (after a light/dark switch).</summary>
+    public void RaiseAll() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
 }
 
+/// <summary>Colors come from the current theme (Themes/*.xaml), so they're looked up on every call.</summary>
 public static class Look
 {
-    static readonly Color[] GpuColors = { Color.FromRgb(0x5E, 0xC8, 0xFF), Color.FromRgb(0xC0, 0x8C, 0xFF), Color.FromRgb(0xF5, 0xB1, 0x4C) };
-    public static readonly Brush Sub = Freeze(new SolidColorBrush(Color.FromRgb(0x8E, 0x97, 0xA8)));
-    public static readonly Brush Warn = Freeze(new SolidColorBrush(Color.FromRgb(0xF5, 0xB1, 0x4C)));
-    public static readonly Brush Ok = Freeze(new SolidColorBrush(Color.FromRgb(0x5B, 0xD6, 0x9A)));
-    public static readonly Brush Danger = Freeze(new SolidColorBrush(Color.FromRgb(0xF0, 0x6A, 0x6A)));
-    public static readonly Brush AutoBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xC9, 0xCF, 0xDB)));
+    static Brush R(string key) => (Brush)Application.Current.Resources[key];
+    public static Brush Sub => R("Sub");
+    public static Brush Warn => R("Warn");
+    public static Brush Ok => R("Ok");
+    public static Brush Danger => R("Danger");
+    /// <summary>Selected fill for non-GPU choices (Auto, All, Windows).</summary>
+    public static Brush AutoBrush => R("Primary");
 
-    static Brush Freeze(Brush b) { b.Freeze(); return b; }
-
-    public static Brush GpuBrush(string? key)
+    /// <summary>GPU colors go by role, not by model: the GPU the monitors are on is always color 0, the others follow in order.</summary>
+    static int Role(string? key)
     {
-        var all = Gpus.All;
-        int i = all.ToList().FindIndex(g => g.Key == key);
-        return i < 0 ? Sub : Freeze(new SolidColorBrush(GpuColors[i % GpuColors.Length]));
+        if (key == null) return -1;
+        var ordered = Gpus.All.OrderBy(g => g.IsDisplayGpu ? 0 : 1).ToList(); // stable, keeps Windows' order otherwise
+        return ordered.FindIndex(g => g.Key == key);
     }
+
+    public static Brush GpuBrush(string? key) => Role(key) is var i and >= 0 ? R($"Gpu{i % 4}") : Sub;
+    /// <summary>Light tint of the GPU's color for pills and selected cards.</summary>
+    public static Brush GpuSoft(string? key) => Role(key) is var i and >= 0 ? R($"Gpu{i % 4}Soft") : Brushes.Transparent;
 
     static readonly Dictionary<string, ImageSource?> IconCache = new(StringComparer.OrdinalIgnoreCase);
 
@@ -100,16 +107,20 @@ public class AppRowVm : Vm
     ObservableCollection<ChoiceVm> _choices = new();
     public ObservableCollection<ChoiceVm> Choices { get => _choices; set => Set(ref _choices, value); }
 
-    string? _onKey; public string? OnKey { get => _onKey; set { if (Set(ref _onKey, value)) { Raise(nameof(OnText)); Raise(nameof(OnBrush)); } } }
-    public string OnText => Gpus.ByKey(OnKey)?.ShortName ?? "-";
+    string? _onKey; public string? OnKey { get => _onKey; set { if (Set(ref _onKey, value)) { Raise(nameof(OnText)); Raise(nameof(OnBrush)); Raise(nameof(OnSoft)); } } }
+    public string OnText => Gpus.ByKey(OnKey)?.ShortName.Replace("RTX ", "").Replace("GTX ", "") ?? "-";
     public Brush OnBrush => Look.GpuBrush(OnKey);
+    public Brush OnSoft => Look.GpuSoft(OnKey);
 
     double _util; public double Util { get => _util; set { if (Set(ref _util, value)) Raise(nameof(UtilText)); } }
     public string UtilText => Util < 0.05 ? "0%" : $"{Util:0.#}%";
     long _mem; public long Mem { get => _mem; set { if (Set(ref _mem, value)) Raise(nameof(MemText)); } }
     public string MemText => Look.Bytes(Mem);
 
-    string? _prefKey; public string? PrefKey { get => _prefKey; set => Set(ref _prefKey, value); }
+    string? _prefKey; public string? PrefKey { get => _prefKey; set { if (Set(ref _prefKey, value)) { Raise(nameof(PrefBrush)); Raise(nameof(PrefSoft)); } } }
+    /// <summary>The action button moves the app to its chosen GPU, so it wears that GPU's color.</summary>
+    public Brush PrefBrush => Look.GpuBrush(PrefKey);
+    public Brush PrefSoft => Look.GpuSoft(PrefKey);
 
     LiveKind _kind; public LiveKind Kind { get => _kind; set { if (Set(ref _kind, value)) { Raise(nameof(KindText)); Raise(nameof(KindBrush)); } } }
     string _kindNote = ""; public string KindNote { get => _kindNote; set => Set(ref _kindNote, value); }
@@ -158,7 +169,7 @@ public class SavedRowVm : Vm
     public string SubText => Missing ? ExePath + "  (file not found)" : ExePath;
     public ObservableCollection<ChoiceVm> Choices { get; set; } = new();
     public bool AutoAssigned { get; set; }
-    public string Badge => AutoAssigned ? "auto" : "";
+    public Visibility BadgeVisible => AutoAssigned ? Visibility.Visible : Visibility.Collapsed;
 }
 
 public class ForceRuleVm : Vm
@@ -192,7 +203,6 @@ public class StartupRowVm : Vm
     public Visibility GpuVisible => Gpu != null ? Visibility.Visible : Visibility.Collapsed;
 
     public const string Windows = "windows", Switcher = "switcher", Off = "off";
-    public static readonly Brush SwitcherBrush = new SolidColorBrush(Color.FromRgb(0x5E, 0xC8, 0xFF));
 }
 
 public class CompatRowVm
@@ -208,12 +218,14 @@ public class GpuCardVm : Vm
     public required string Key { get; init; }
     public string Name { get; set; } = "";
     public Brush Brush { get; set; } = Look.Sub;
+    public Brush Soft { get; set; } = Brushes.Transparent;
     public string Badge { get; set; } = "";
+    public Visibility BadgeVisible => string.IsNullOrEmpty(Badge) ? Visibility.Collapsed : Visibility.Visible;
     double _util; public double Util { get => _util; set { if (Set(ref _util, value)) Raise(nameof(UtilText)); } }
     public string UtilText => $"{Util:0}%";
     string _memText = ""; public string MemText { get => _memText; set => Set(ref _memText, value); }
     string _state = ""; public string State { get => _state; set => Set(ref _state, value); }
     Brush _stateBrush = Look.Sub; public Brush StateBrush { get => _stateBrush; set => Set(ref _stateBrush, value); }
-    /// <summary>Card outline: GPU color while the Running list is filtered to this GPU.</summary>
-    Brush? _outline; public Brush? Outline { get => _outline; set => Set(ref _outline, value); }
+    /// <summary>True while the Running list is filtered to this GPU (card gets its color).</summary>
+    bool _sel; public bool IsSelected { get => _sel; set => Set(ref _sel, value); }
 }

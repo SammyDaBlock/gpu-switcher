@@ -53,7 +53,17 @@ public partial class MainWindow : Window
             if (Tabs.SelectedIndex == 3) RefreshStartup();
             if (Tabs.SelectedIndex == 4) RefreshSettings();
         };
-        SourceInitialized += (_, _) => DarkTitleBar();
+        SourceInitialized += (_, _) =>
+        {
+            Theme.ApplyMica(this);
+            // Windows broadcasts this when light/dark is switched
+            HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook((IntPtr _, int msg, IntPtr _, IntPtr lParam, ref bool _) =>
+            {
+                if (Theme.IsThemeMessage(msg, lParam)) Dispatcher.BeginInvoke(() => Theme.Refresh());
+                return IntPtr.Zero;
+            });
+        };
+        Theme.Changed += OnThemeChanged;
         Closing += (_, e) =>
         {
             if (App.Exiting) return;
@@ -61,7 +71,35 @@ public partial class MainWindow : Window
             Hide();
             ((App)Application.Current).HiddenToTray();
         };
-        IsVisibleChanged += (_, _) => { if (IsVisible) OnData(_lastApps, LiveSwitch.Monitor?.Latest ?? new GpuSnapshot()); };
+        IsVisibleChanged += (_, _) =>
+        {
+            if (!IsVisible) return;
+            Theme.Refresh(); // may have switched while we were in the tray
+            if (_themeDirty) RecolorAll();
+            OnData(_lastApps, LiveSwitch.Monitor?.Latest ?? new GpuSnapshot());
+        };
+    }
+
+    // ------------------------------------------------------------------ light / dark
+
+    bool _themeDirty;
+
+    void OnThemeChanged()
+    {
+        Theme.ApplyTitleBar(this);
+        if (IsVisible) { RecolorAll(); OnData(_lastApps, LiveSwitch.Monitor?.Latest ?? new GpuSnapshot()); }
+        else _themeDirty = true;
+    }
+
+    /// <summary>Brushes from code are looked up once, so rebuild everything that holds one.</summary>
+    void RecolorAll()
+    {
+        _themeDirty = false;
+        _gpuSignature = ""; // cards, filter and row pickers get rebuilt on the next OnData
+        foreach (var r in _rows) r.RaiseAll();
+        if (Tabs.SelectedIndex == 1) RefreshSaved();
+        if (Tabs.SelectedIndex == 3) RefreshStartup();
+        if (Tabs.SelectedIndex == 4) RefreshSettings();
     }
 
     // ------------------------------------------------------------------ data
@@ -179,7 +217,7 @@ public partial class MainWindow : Window
             _gpuSignature = sig;
             _cards.Clear();
             foreach (var g in gpus)
-                _cards.Add(new GpuCardVm { Key = g.Key, Name = g.ShortName, Brush = Look.GpuBrush(g.Key), Badge = g.IsDisplayGpu ? "monitors" : "" });
+                _cards.Add(new GpuCardVm { Key = g.Key, Name = g.ShortName, Brush = Look.GpuBrush(g.Key), Soft = Look.GpuSoft(g.Key), Badge = g.IsDisplayGpu ? "monitors" : "" });
             EvacButtons.ItemsSource = gpus.Where(g => !g.IsDisplayGpu).Select(g => new { Label = $"Move everything off {g.ShortName}", g.Key }).ToList();
             foreach (var r in _rows) r.Choices = ChoiceVm.Build(r, true);
             if (_filterKey != null && gpus.All(g => g.Key != _filterKey)) _filterKey = null;
@@ -280,7 +318,7 @@ public partial class MainWindow : Window
     void ShowFilter()
     {
         ChoiceVm.Select(_filter.Choices, _filterKey);
-        foreach (var c in _cards) c.Outline = c.Key == _filterKey ? c.Brush : null;
+        foreach (var c in _cards) c.IsSelected = c.Key == _filterKey;
     }
 
     void GpuCard_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -501,8 +539,8 @@ public partial class MainWindow : Window
             row.Mode = new StartupPicker { Kind = "mode", Row = row };
             row.Mode.Choices = new()
             {
-                new ChoiceVm { Label = "Windows", Key = StartupRowVm.Windows, SelectedBrush = Look.AutoBrush, Owner = row.Mode },
-                new ChoiceVm { Label = "GPU Switcher", Key = StartupRowVm.Switcher, SelectedBrush = StartupRowVm.SwitcherBrush, Owner = row.Mode },
+                new ChoiceVm { Label = "Windows", Key = StartupRowVm.Windows, SelectedBrush = Look.Sub, Owner = row.Mode },
+                new ChoiceVm { Label = "GPU Switcher", Key = StartupRowVm.Switcher, SelectedBrush = Look.AutoBrush, Owner = row.Mode },
                 new ChoiceVm { Label = "Off", Key = StartupRowVm.Off, SelectedBrush = Look.Sub, Owner = row.Mode },
             };
             var managed = s.ManagedStartup.FirstOrDefault(m => m.Id == i.Id);
@@ -799,17 +837,4 @@ public partial class MainWindow : Window
     void OpenLogs_Click(object sender, RoutedEventArgs e) => Process.Start("explorer.exe", Log.Dir);
 
     public void SelectTab(int i) => Tabs.SelectedIndex = i;
-
-    // ------------------------------------------------------------------ chrome
-
-    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
-
-    void DarkTitleBar()
-    {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        int on = 1;
-        DwmSetWindowAttribute(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, ref on, sizeof(int));
-        int caption = 0x00151110; // COLORREF (BGR) of the Bg color
-        DwmSetWindowAttribute(hwnd, 35 /* DWMWA_CAPTION_COLOR */, ref caption, sizeof(int));
-    }
 }

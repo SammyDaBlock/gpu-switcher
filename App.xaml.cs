@@ -38,6 +38,10 @@ public partial class App : Application
 
         DispatcherUnhandledException += (_, ex) => { Log.Write("UI error: " + ex.Exception); ex.Handled = true; };
 
+        // light/dark: follow Windows (screenshots can force one)
+        if (args.Length >= 4 && args[0] == "--screenshot") UI.Theme.Forced = args[3] != "light";
+        UI.Theme.Refresh(force: true);
+
         // anything a previous run (or crash) left disabled comes back first
         Gpus.Refresh();
         int recovered = DeviceGuard.RecoverLeftovers();
@@ -127,6 +131,7 @@ public partial class App : Application
         });
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApp());
+        UI.TrayMenuRenderer.Style(menu);
         _tray.ContextMenuStrip = menu;
     }
 
@@ -229,10 +234,46 @@ public partial class App : Application
 
     // ------------------------------------------------------------------ test hooks
 
+    /// <summary>--screenshot &lt;png&gt; [tab] [dark|light]. tab -1 = tray menu, -2 = a dialog (both captured from the screen).
+    /// For tabs, &lt;png&gt; is the rendered window and &lt;png&gt;.screen.png what's really on screen (with Mica).</summary>
     async Task Screenshot(string path, int tab)
     {
+        if (tab == -1)
+        {
+            var menu = _tray!.ContextMenuStrip!;
+            var wa = Forms.Screen.PrimaryScreen!.WorkingArea;
+            menu.Show(wa.Right - 400, wa.Bottom - 300);
+            await Task.Delay(1200);            var r = menu.Bounds;
+            r.Inflate(16, 16);
+            CaptureScreen(r, path);
+            menu.Close();
+            ExitApp();
+            return;
+        }
+        if (tab == -2)
+        {
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                var dlg = Windows.OfType<Window>().FirstOrDefault(w => w is not GpuSwitcher.MainWindow && w.IsVisible);
+                if (dlg != null) { CaptureScreen(ScreenRect(dlg, 16), path); dlg.Close(); }
+            };
+            timer.Start();
+            UI.Dialog.Confirm("Turn RTX 3060 off for 5 seconds?",
+                "Using it right now: Discord, Brave.\n\nApps that can handle it move to RTX 5070. Others may crash or restart. Your monitors stay on.", "Turn it off", "Cancel");
+            ExitApp();
+            return;
+        }
+
         _window!.SelectTab(tab);
         await Task.Delay(5000);
+        // Mica only shows on the active window; a process started in the background isn't allowed to take focus,
+        // a synthetic Alt press lifts that lock
+        keybd_event(0x12, 0, 0, 0); keybd_event(0x12, 0, 2, 0);
+        SetForegroundWindow(new WindowInteropHelper(_window).Handle);
+        await Task.Delay(800);
+        CaptureScreen(ScreenRect(_window, 0), Path.ChangeExtension(path, ".screen.png"));
         var root = (FrameworkElement)_window.Content;
         var dpi = VisualTreeHelper.GetDpi(_window);
         var rtb = new RenderTargetBitmap((int)(root.ActualWidth * dpi.DpiScaleX), (int)(root.ActualHeight * dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
@@ -247,6 +288,27 @@ public partial class App : Application
         enc.Frames.Add(BitmapFrame.Create(rtb));
         using (var fs = File.Create(path)) enc.Save(fs);
         ExitApp();
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, nint extra);
+
+    /// <summary>A window's bounds on screen in pixels, plus some margin for the shadow.</summary>
+    static Drawing.Rectangle ScreenRect(Window w, int margin)
+    {
+        var dpi = VisualTreeHelper.GetDpi(w);
+        var content = (FrameworkElement)w.Content;
+        var tl = content.PointToScreen(new Point(0, 0));
+        var r = new Drawing.Rectangle((int)tl.X, (int)tl.Y, (int)(content.ActualWidth * dpi.DpiScaleX), (int)(content.ActualHeight * dpi.DpiScaleY));
+        r.Inflate(margin, margin);
+        return r;
+    }
+
+    static void CaptureScreen(Drawing.Rectangle r, string path)
+    {
+        using var bmp = new Drawing.Bitmap(r.Width, r.Height);
+        using (var g = Drawing.Graphics.FromImage(bmp)) g.CopyFromScreen(r.Location, Drawing.Point.Empty, r.Size);
+        bmp.Save(path, Drawing.Imaging.ImageFormat.Png);
     }
 
     /// <summary>Headless modes: the watchdog, plus test hooks. Returns true if handled.</summary>

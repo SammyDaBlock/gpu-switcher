@@ -1,13 +1,13 @@
 <Window x:Class="GpuSwitcher.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="GPU Switcher" Width="1180" Height="760" MinWidth="980" MinHeight="560"
-        Background="{StaticResource Bg}" Foreground="{StaticResource Text}" WindowStartupLocation="CenterScreen"
-        TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
+        Title="GPU Switcher" Width="1200" Height="780" MinWidth="1080" MinHeight="560"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}" FontFamily="{StaticResource UiFont}"
+        WindowStartupLocation="CenterScreen" TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
     <Window.Resources>
         <!-- segmented GPU picker used everywhere -->
         <DataTemplate x:Key="ChoicePicker">
-            <Border Background="{StaticResource Panel2}" CornerRadius="7" BorderBrush="{StaticResource Line}" BorderThickness="1" HorizontalAlignment="Left">
+            <Border Background="{DynamicResource Control}" CornerRadius="6" BorderBrush="{DynamicResource Line}" BorderThickness="1" Padding="1" HorizontalAlignment="Left">
                 <ItemsControl ItemsSource="{Binding Choices}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -20,9 +20,23 @@
                 </ItemsControl>
             </Border>
         </DataTemplate>
+
+        <!-- GPU card in the header -->
+        <Style x:Key="GpuCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Padding" Value="14,11"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource CardHover}"/>
+                </Trigger>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="Background" Value="{Binding Soft}"/>
+                    <Setter Property="BorderBrush" Value="{Binding Brush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
-    <Grid Margin="20,16,20,10">
+    <Grid Margin="24,14,24,10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -31,10 +45,10 @@
         </Grid.RowDefinitions>
 
         <!-- header -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,14">
+        <DockPanel Grid.Row="0" Margin="0,0,0,18">
             <StackPanel DockPanel.Dock="Left" VerticalAlignment="Center">
-                <TextBlock Text="GPU Switcher" FontSize="22" FontWeight="SemiBold"/>
-                <TextBlock Text="Pick which GPU every app runs on" Style="{StaticResource SubText}"/>
+                <TextBlock Text="GPU Switcher" FontFamily="{StaticResource DisplayFont}" FontSize="26" FontWeight="SemiBold"/>
+                <TextBlock Text="Pick which GPU every app runs on" Style="{StaticResource SubText}" FontSize="13" Margin="1,2,0,0"/>
             </StackPanel>
             <ItemsControl x:Name="GpuCards" HorizontalAlignment="Right">
                 <ItemsControl.ItemsPanel>
@@ -42,19 +56,20 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Style="{StaticResource Card}" Width="250" Margin="10,0,0,0" Padding="12,10" Cursor="Hand" Tag="{Binding Key}"
-                                MouseLeftButtonUp="GpuCard_Click" ToolTip="Click to show only apps on this GPU"
-                                BorderBrush="{Binding Outline, TargetNullValue={StaticResource Line}}">
+                        <Border Style="{StaticResource GpuCard}" Width="250" Margin="10,0,0,0" Cursor="Hand" Tag="{Binding Key}"
+                                MouseLeftButtonUp="GpuCard_Click" ToolTip="Click to show only apps on this GPU">
                             <StackPanel>
                                 <DockPanel>
-                                    <Ellipse Width="9" Height="9" Fill="{Binding Brush}" Margin="0,0,7,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Badge}" DockPanel.Dock="Right" Style="{StaticResource SubText}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                    <Ellipse Width="10" Height="10" Fill="{Binding Brush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <Border DockPanel.Dock="Right" Style="{StaticResource Chip}" Visibility="{Binding BadgeVisible}" ToolTip="Your monitors are plugged into this GPU">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE7F4;" Style="{StaticResource Glyph}" FontSize="11" Foreground="{DynamicResource Sub}" Margin="0,0,4,0"/>
+                                            <TextBlock Text="Monitors" FontSize="11" Foreground="{DynamicResource Sub}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                 </DockPanel>
-                                <Grid Margin="0,8,0,4" Height="5">
-                                    <Border Background="{StaticResource Panel2}" CornerRadius="3"/>
-                                    <ProgressBar Value="{Binding Util, Mode=OneWay}" Maximum="100" Foreground="{Binding Brush}" Background="Transparent" BorderThickness="0" Height="5"/>
-                                </Grid>
+                                <ProgressBar Style="{StaticResource Meter}" Value="{Binding Util, Mode=OneWay}" Maximum="100" Foreground="{Binding Brush}" Margin="0,10,0,8"/>
                                 <DockPanel>
                                     <TextBlock Text="{Binding State}" Foreground="{Binding StateBrush}" DockPanel.Dock="Right" FontSize="12"/>
                                     <TextBlock Style="{StaticResource SubText}">
@@ -69,10 +84,11 @@
         </DockPanel>
 
         <!-- banner while a GPU is off -->
-        <Border Grid.Row="1" x:Name="BusyBanner" Visibility="Collapsed" Background="#3A2A12" BorderBrush="{StaticResource Warn}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
+        <Border Grid.Row="1" x:Name="BusyBanner" Visibility="Collapsed" Style="{StaticResource InfoBar}" Margin="0,0,0,12">
             <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Re-enable now" Style="{StaticResource WarnButton}" Click="EnableAll_Click"/>
-                <TextBlock x:Name="BusyText" Foreground="{StaticResource Warn}" VerticalAlignment="Center" Text="A GPU is temporarily off. It comes back automatically."/>
+                <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Warn}" Margin="0,0,12,0"/>
+                <Button DockPanel.Dock="Right" Content="Re-enable now" Click="EnableAll_Click"/>
+                <TextBlock x:Name="BusyText" VerticalAlignment="Center" Text="A GPU is temporarily off. It comes back automatically."/>
             </DockPanel>
         </Border>
 
@@ -80,14 +96,15 @@
             <!-- ================= RUNNING ================= -->
             <TabItem Header="Running">
                 <DockPanel>
-                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-                        <Grid DockPanel.Dock="Left" Width="200">
-                            <TextBox x:Name="Search" TextChanged="Search_TextChanged"/>
-                            <TextBlock x:Name="SearchHint" Text="Search apps" Style="{StaticResource SubText}" Margin="10,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <Grid DockPanel.Dock="Left" Width="220">
+                            <TextBox x:Name="Search" TextChanged="Search_TextChanged" Padding="10,6,32,6"/>
+                            <TextBlock x:Name="SearchHint" Text="Search apps" Foreground="{DynamicResource Sub}" FontSize="13" Margin="12,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                            <TextBlock Text="&#xE721;" Style="{StaticResource Glyph}" FontSize="13" Foreground="{DynamicResource Sub}" HorizontalAlignment="Right" Margin="0,0,11,0" IsHitTestVisible="False"/>
                         </Grid>
                         <ContentPresenter x:Name="GpuFilterPicker" DockPanel.Dock="Left" ContentTemplate="{StaticResource ChoicePicker}" Margin="12,0,0,0" VerticalAlignment="Center"
                                           ToolTip="Only show apps running on this GPU"/>
-                        <CheckBox x:Name="ShowSystem" DockPanel.Dock="Left" Style="{StaticResource Switch}" Content="Windows processes" Margin="14,0,0,0" VerticalAlignment="Center" Click="ShowSystem_Click"/>
+                        <CheckBox x:Name="ShowSystem" DockPanel.Dock="Left" Style="{StaticResource Switch}" Content="Windows processes" Margin="18,0,0,0" VerticalAlignment="Center" Click="ShowSystem_Click"/>
                         <Button x:Name="FixAllButton" DockPanel.Dock="Right" Content="Put everything on its GPU" Style="{StaticResource AccentButton}" Margin="8,0,0,0" Click="FixAll_Click"
                                 ToolTip="Moves every running app to the GPU it's set to. Chromium apps switch live, other apps restart (you get asked first), games are never restarted automatically."/>
                         <ItemsControl x:Name="EvacButtons" HorizontalAlignment="Right">
@@ -96,122 +113,163 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Content="{Binding Label}" Tag="{Binding Key}" Style="{StaticResource WarnButton}" Click="Evacuate_Click" Margin="8,0,0,0"
-                                            ToolTip="Turns this GPU off for about 5 seconds. Apps that can handle it move to the other GPU, the rest may crash or restart. Your monitors aren't affected."/>
+                                    <Button Tag="{Binding Key}" Click="Evacuate_Click" Margin="8,0,0,0"
+                                            ToolTip="Turns this GPU off for about 5 seconds. Apps that can handle it move to the other GPU, the rest may crash or restart. Your monitors aren't affected.">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE7E8;" Style="{StaticResource Glyph}" FontSize="12" Foreground="{DynamicResource Warn}" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{Binding Label}"/>
+                                        </StackPanel>
+                                    </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </DockPanel>
 
-                    <!-- column headers -->
-                    <Grid DockPanel.Dock="Top" Margin="10,0,18,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="110"/><ColumnDefinition Width="60"/>
-                            <ColumnDefinition Width="72"/><ColumnDefinition Width="200"/><ColumnDefinition Width="150"/><ColumnDefinition Width="130"/><ColumnDefinition Width="64"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="1" Text="APP" Style="{StaticResource SubText}" FontSize="11"/>
-                        <TextBlock Grid.Column="2" Text="RUNNING ON" Style="{StaticResource SubText}" FontSize="11"/>
-                        <TextBlock Grid.Column="3" Text="USAGE" Style="{StaticResource SubText}" FontSize="11"/>
-                        <TextBlock Grid.Column="4" Text="VRAM" Style="{StaticResource SubText}" FontSize="11"/>
-                        <TextBlock Grid.Column="5" Text="USE GPU" Style="{StaticResource SubText}" FontSize="11"/>
-                        <TextBlock Grid.Column="6" Text="SWITCHING" Style="{StaticResource SubText}" FontSize="11"/>
-                        <TextBlock Grid.Column="8" Text="FORCE" Style="{StaticResource SubText}" FontSize="11"/>
-                    </Grid>
+                    <Border Style="{StaticResource Layer}">
+                        <DockPanel>
+                            <!-- column headers -->
+                            <Grid DockPanel.Dock="Top" Margin="10,0,18,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="116"/><ColumnDefinition Width="62"/>
+                                    <ColumnDefinition Width="76"/><ColumnDefinition Width="206"/><ColumnDefinition Width="150"/><ColumnDefinition Width="132"/><ColumnDefinition Width="56"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="1" Text="App" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="2" Text="Running on" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="3" Text="Usage" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="4" Text="VRAM" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="5" Text="Use GPU" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="6" Text="Switching" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="8" Text="Force" Style="{StaticResource Caption}"/>
+                            </Grid>
 
-                    <ListBox x:Name="RunningList">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="110"/><ColumnDefinition Width="60"/>
-                                        <ColumnDefinition Width="72"/><ColumnDefinition Width="200"/><ColumnDefinition Width="150"/><ColumnDefinition Width="130"/><ColumnDefinition Width="64"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Image Source="{Binding Icon}" Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" ToolTip="{Binding ExePath}">
-                                        <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                                        <TextBlock Text="{Binding ExeName}" Style="{StaticResource SubText}" FontSize="11" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Ellipse Width="8" Height="8" Fill="{Binding OnBrush}" Margin="0,0,7,0"/>
-                                        <TextBlock Text="{Binding OnText}" Foreground="{Binding OnBrush}" FontSize="13"/>
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="3" Text="{Binding UtilText}" VerticalAlignment="Center" FontSize="13"/>
-                                    <TextBlock Grid.Column="4" Text="{Binding MemText}" VerticalAlignment="Center" Style="{StaticResource SubText}"/>
-                                    <ContentPresenter Grid.Column="5" Content="{Binding}" ContentTemplate="{StaticResource ChoicePicker}" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="6" Text="{Binding KindText}" Foreground="{Binding KindBrush}" ToolTip="{Binding KindNote}" VerticalAlignment="Center" FontSize="12"/>
-                                    <Grid Grid.Column="7" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                        <Button Content="{Binding ActionText}" Visibility="{Binding ActionVisible}" ToolTip="{Binding ActionTip}" Style="{StaticResource AccentButton}" Padding="10,4" FontSize="12" Click="Action_Click"/>
-                                        <TextBlock Text="working…" Visibility="{Binding BusyVisible}" Style="{StaticResource SubText}"/>
-                                    </Grid>
-                                    <CheckBox Grid.Column="8" Style="{StaticResource Switch}" IsChecked="{Binding Force, Mode=OneWay}" IsEnabled="{Binding ForceAllowed}"
-                                              ToolTip="{Binding ForceTip}" ToolTipService.ShowOnDisabled="True" Click="Force_Click" VerticalAlignment="Center"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                            <ListBox x:Name="RunningList">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="116"/><ColumnDefinition Width="62"/>
+                                                <ColumnDefinition Width="76"/><ColumnDefinition Width="206"/><ColumnDefinition Width="150"/><ColumnDefinition Width="132"/><ColumnDefinition Width="56"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Image Source="{Binding Icon}" Width="22" Height="22" HorizontalAlignment="Left" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" ToolTip="{Binding ExePath}" Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding ExeName}" Style="{StaticResource SubText}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <!-- GPU pill -->
+                                            <Border Grid.Column="2" Background="{Binding OnSoft}" CornerRadius="10" Padding="8,2,10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Ellipse Width="7" Height="7" Fill="{Binding OnBrush}" Margin="0,1,6,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding OnText}" Foreground="{Binding OnBrush}" FontSize="12" FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <TextBlock Grid.Column="3" Text="{Binding UtilText}" VerticalAlignment="Center" FontSize="13"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding MemText}" VerticalAlignment="Center" Style="{StaticResource SubText}"/>
+                                            <ContentPresenter Grid.Column="5" Content="{Binding}" ContentTemplate="{StaticResource ChoicePicker}" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="6" Text="{Binding KindText}" Foreground="{Binding KindBrush}" ToolTip="{Binding KindNote}" VerticalAlignment="Center" FontSize="12"/>
+                                            <Grid Grid.Column="7" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                                <Button Content="{Binding ActionText}" Visibility="{Binding ActionVisible}" ToolTip="{Binding ActionTip}" Style="{StaticResource GpuButton}"
+                                                        Background="{Binding PrefSoft}" BorderBrush="{Binding PrefBrush}" Foreground="{Binding PrefBrush}" Click="Action_Click"/>
+                                                <TextBlock Text="Working…" Visibility="{Binding BusyVisible}" Style="{StaticResource SubText}"/>
+                                            </Grid>
+                                            <CheckBox Grid.Column="8" Style="{StaticResource Switch}" IsChecked="{Binding Force, Mode=OneWay}" IsEnabled="{Binding ForceAllowed}"
+                                                      ToolTip="{Binding ForceTip}" ToolTipService.ShowOnDisabled="True" Click="Force_Click" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </Border>
                 </DockPanel>
             </TabItem>
 
             <!-- ================= SAVED ================= -->
             <TabItem Header="Saved choices">
                 <DockPanel>
-                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
                         <Button x:Name="RemoveMissing" DockPanel.Dock="Right" Content="Remove missing" Click="RemoveMissing_Click" VerticalAlignment="Top"
                                 ToolTip="Removes choices for apps that don't exist anymore (old Discord versions, uninstalled games...)"/>
-                        <TextBlock Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,0,16,0" VerticalAlignment="Center"
+                        <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,24,0" MaxWidth="820" HorizontalAlignment="Left" VerticalAlignment="Center"
                                    Text="Every app with a GPU choice saved in Windows. These apply on the next launch, even when GPU Switcher isn't running. Auto = remove the choice. Apps that update into a new folder (Discord, Roblox Studio) keep their choice automatically."/>
                     </DockPanel>
-                    <ListBox x:Name="SavedList">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="60"/><ColumnDefinition Width="200"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Image Source="{Binding Icon}" Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Name}" FontSize="13"/>
-                                        <TextBlock Text="{Binding SubText}" Style="{StaticResource SubText}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding ExePath}"/>
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="2" Text="{Binding Badge}" Style="{StaticResource SubText}" VerticalAlignment="Center"
-                                               ToolTip="Set by auto-assign"/>
-                                    <ContentPresenter Grid.Column="3" Content="{Binding}" ContentTemplate="{StaticResource ChoicePicker}" VerticalAlignment="Center"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <Border Style="{StaticResource Layer}">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top" Margin="10,0,18,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="70"/><ColumnDefinition Width="206"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="1" Text="App" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="3" Text="Use GPU" Style="{StaticResource Caption}"/>
+                            </Grid>
+                            <ListBox x:Name="SavedList">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="70"/><ColumnDefinition Width="206"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Image Source="{Binding Icon}" Width="22" Height="22" HorizontalAlignment="Left" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding SubText}" Style="{StaticResource SubText}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding ExePath}"/>
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Style="{StaticResource Chip}" Visibility="{Binding BadgeVisible}" ToolTip="Set by auto-assign">
+                                                <TextBlock Text="auto" FontSize="11" Foreground="{DynamicResource Sub}"/>
+                                            </Border>
+                                            <ContentPresenter Grid.Column="3" Content="{Binding}" ContentTemplate="{StaticResource ChoicePicker}" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </Border>
                 </DockPanel>
             </TabItem>
 
             <!-- ================= FORCE ================= -->
             <TabItem Header="Force mode">
                 <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="200"/></Grid.RowDefinitions>
-                    <DockPanel Margin="0,0,0,10">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="210"/></Grid.RowDefinitions>
+                    <DockPanel Margin="0,0,0,12">
                         <Button DockPanel.Dock="Right" Content="Add Fortnite" Style="{StaticResource AccentButton}" Click="AddFortnite_Click" VerticalAlignment="Top"/>
-                        <TextBlock Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,0,16,0"
-                                   Text="For games that ignore every GPU setting. When the game (or its launcher) starts, the other GPU is turned off until the game has picked its GPU, then turned back on. Nothing touches the game itself, so it's safe with anti-cheat. Turn it on for any game with the FORCE switch in the Running tab."/>
+                        <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,24,0" MaxWidth="820" HorizontalAlignment="Left"
+                                   Text="For games that ignore every GPU setting. When the game (or its launcher) starts, the other GPU is turned off until the game has picked its GPU, then turned back on. Nothing touches the game itself. Turn it on for any game with the Force switch in the Running tab."/>
                     </DockPanel>
-                    <ListBox Grid.Row="1" x:Name="ForceList">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <DockPanel>
-                                    <CheckBox DockPanel.Dock="Left" Style="{StaticResource Switch}" IsChecked="{Binding Enabled}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <Button DockPanel.Dock="Right" Content="Remove" Style="{StaticResource SmallButton}" Click="RemoveRule_Click" VerticalAlignment="Center"/>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold"/>
-                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource SubText}" TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                </DockPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                    <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,10,0,0" Padding="10">
+                    <Border Grid.Row="1" Style="{StaticResource Layer}" Padding="6">
+                        <Grid>
+                            <ListBox x:Name="ForceList">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel>
+                                            <CheckBox DockPanel.Dock="Left" Style="{StaticResource Switch}" IsChecked="{Binding Enabled}" VerticalAlignment="Center" Margin="0,0,14,0"/>
+                                            <Button DockPanel.Dock="Right" Content="Remove" Style="{StaticResource SmallButton}" Click="RemoveRule_Click" VerticalAlignment="Center"/>
+                                            <StackPanel Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Detail}" Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock Text="No games in force mode yet. Use the Force switch in the Running tab, or Add Fortnite." FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource SubText}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasItems, ElementName=ForceList}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
+                    <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0" Padding="12,12,6,8">
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Activity" Style="{StaticResource H2}" Margin="2,0,0,6"/>
+                            <TextBlock DockPanel.Dock="Top" Text="Activity" Style="{StaticResource H2}" Margin="4,0,0,6"/>
                             <ListBox x:Name="ActivityList" FontFamily="Cascadia Mono, Consolas" FontSize="12">
                                 <ListBox.ItemTemplate>
-                                    <DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource SubText}" TextWrapping="Wrap"/></DataTemplate>
+                                    <DataTemplate><TextBlock Text="{Binding}" Foreground="{DynamicResource Sub}" FontFamily="Cascadia Mono, Consolas" FontSize="12" TextWrapping="Wrap"/></DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
                         </DockPanel>
@@ -222,79 +280,90 @@
             <!-- ================= STARTUP ================= -->
             <TabItem Header="Startup apps">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,0,0,10"
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,12" MaxWidth="900" HorizontalAlignment="Left"
                                Text="GPU Switcher can start your startup apps itself, after it's ready: their GPU choice is fixed first (also right after an app updated, like Discord), then they launch one by one. Taken-over apps show as Disabled in Task Manager, that's normal. 'Windows' = Windows starts it like before."/>
-                    <Border DockPanel.Dock="Top" x:Name="StartupWarning" Visibility="Collapsed" Background="#3A2A12" BorderBrush="{StaticResource Warn}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,10">
+                    <Border DockPanel.Dock="Top" x:Name="StartupWarning" Visibility="Collapsed" Style="{StaticResource InfoBar}" Margin="0,0,0,12">
                         <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="Turn it on" Style="{StaticResource WarnButton}" Click="StartupAutostartOn_Click"/>
-                            <TextBlock Foreground="{StaticResource Warn}" VerticalAlignment="Center" TextWrapping="Wrap"
+                            <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" Style="{StaticResource Glyph}" Foreground="{DynamicResource Warn}" Margin="0,0,12,0"/>
+                            <Button DockPanel.Dock="Right" Content="Turn it on" Click="StartupAutostartOn_Click"/>
+                            <TextBlock VerticalAlignment="Center" TextWrapping="Wrap"
                                        Text="GPU Switcher isn't set to start with Windows, so the apps it took over won't start at all."/>
                         </DockPanel>
                     </Border>
-                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-                        <Button DockPanel.Dock="Left" Content="+ Add app" Style="{StaticResource AccentButton}" Click="StartupAdd_Click" Margin="0,0,8,0"
-                                ToolTip="Pick a running or installed app (or browse for one). GPU Switcher starts it at logon on the GPU you pick."/>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <Button DockPanel.Dock="Left" Style="{StaticResource AccentButton}" Click="StartupAdd_Click" Margin="0,0,8,0"
+                                ToolTip="Pick a running or installed app (or browse for one). GPU Switcher starts it at logon on the GPU you pick.">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" FontSize="12" Margin="0,0,8,0"/>
+                                <TextBlock Text="Add app"/>
+                            </StackPanel>
+                        </Button>
                         <Button DockPanel.Dock="Left" Content="Take over all" Click="StartupTakeAll_Click"
                                 ToolTip="Every startup app that's on right now, except Windows and driver stuff"/>
                         <Button DockPanel.Dock="Left" x:Name="StartupGiveAll" Content="Give all back to Windows" Margin="8,0,0,0" Click="StartupGiveAll_Click"/>
-                        <Button DockPanel.Dock="Left" x:Name="StartupTest" Content="Launch them now (test)" Margin="8,0,0,0" Click="StartupTest_Click"/>
+                        <Button DockPanel.Dock="Left" x:Name="StartupTest" Content="Test launch" Margin="8,0,0,0" Click="StartupTest_Click"
+                                ToolTip="Launches every app GPU Switcher manages right now, the same way it does at logon"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <CheckBox x:Name="StartupTakeNew" Style="{StaticResource Switch}" Content="Also take over new startup apps" VerticalAlignment="Center" Click="StartupTakeNew_Click"/>
-                            <TextBlock Text="Gap" Style="{StaticResource SubText}" VerticalAlignment="Center" Margin="18,0,6,0"/>
-                            <TextBox x:Name="StartupGap" Width="60" TextAlignment="Center" LostFocus="StartupGap_LostFocus" ToolTip="Seconds between launching each app"/>
-                            <TextBlock Text="s" Style="{StaticResource SubText}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                            <TextBlock Text="Gap" Foreground="{DynamicResource Sub}" FontSize="13" VerticalAlignment="Center" Margin="16,0,8,0"/>
+                            <TextBox x:Name="StartupGap" Width="50" Padding="4,6" TextAlignment="Center" LostFocus="StartupGap_LostFocus" ToolTip="Seconds between launching each app"/>
+                            <TextBlock Text="s" Foreground="{DynamicResource Sub}" FontSize="13" VerticalAlignment="Center" Margin="6,0,0,0"/>
                         </StackPanel>
                     </DockPanel>
-                    <Grid DockPanel.Dock="Top" Margin="10,0,18,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="250"/><ColumnDefinition Width="200"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="1" Text="APP" Style="{StaticResource SubText}" FontSize="11"/>
-                        <TextBlock Grid.Column="2" Text="STARTED BY" Style="{StaticResource SubText}" FontSize="11"/>
-                        <TextBlock Grid.Column="3" Text="USE GPU" Style="{StaticResource SubText}" FontSize="11"/>
-                    </Grid>
-                    <ListBox x:Name="StartupList">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="250"/><ColumnDefinition Width="200"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Image Source="{Binding Icon}" Width="20" Height="20" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <TextBlock Text="{Binding Name}" FontSize="13"/>
-                                        <TextBlock Text="{Binding Sub}" Style="{StaticResource SubText}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding Item.Command}"/>
-                                    </StackPanel>
-                                    <ContentPresenter Grid.Column="2" Content="{Binding Mode}" ContentTemplate="{StaticResource ChoicePicker}" VerticalAlignment="Center"/>
-                                    <ContentPresenter Grid.Column="3" Content="{Binding Gpu}" ContentTemplate="{StaticResource ChoicePicker}" VerticalAlignment="Center" Visibility="{Binding GpuVisible}"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <Border Style="{StaticResource Layer}">
+                        <DockPanel>
+                            <Grid DockPanel.Dock="Top" Margin="10,0,18,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="260"/><ColumnDefinition Width="206"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="1" Text="App" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="2" Text="Started by" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="3" Text="Use GPU" Style="{StaticResource Caption}"/>
+                            </Grid>
+                            <ListBox x:Name="StartupList">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="260"/><ColumnDefinition Width="206"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Image Source="{Binding Icon}" Width="22" Height="22" HorizontalAlignment="Left" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Sub}" Style="{StaticResource SubText}" FontSize="11" TextTrimming="CharacterEllipsis" ToolTip="{Binding Item.Command}"/>
+                                            </StackPanel>
+                                            <ContentPresenter Grid.Column="2" Content="{Binding Mode}" ContentTemplate="{StaticResource ChoicePicker}" VerticalAlignment="Center"/>
+                                            <ContentPresenter Grid.Column="3" Content="{Binding Gpu}" ContentTemplate="{StaticResource ChoicePicker}" VerticalAlignment="Center" Visibility="{Binding GpuVisible}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </Border>
                 </DockPanel>
             </TabItem>
 
             <!-- ================= SETTINGS ================= -->
             <TabItem Header="Settings">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel MaxWidth="900" HorizontalAlignment="Left">
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel MaxWidth="900" HorizontalAlignment="Left" Margin="0,0,10,0">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock Text="Auto-assign" Style="{StaticResource H2}"/>
-                                <TextBlock Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,0,0,12"
+                                <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,14"
                                            Text="Gives every app that doesn't have a GPU choice yet a default, the moment it shows up. Games (Steam / Epic / Riot... folders, Unity and Unreal games) get their own GPU. Apps you already set, or change by hand later, are never touched."/>
-                                <CheckBox x:Name="AutoEnabled" Style="{StaticResource Switch}" Content="Turn on auto-assign" Click="AutoEnabled_Click" Margin="0,0,0,12"/>
+                                <CheckBox x:Name="AutoEnabled" Style="{StaticResource Switch}" Content="Turn on auto-assign" Click="AutoEnabled_Click" Margin="0,0,0,14"/>
                                 <Grid Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                                    <TextBlock Text="Apps go to" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Apps go to" VerticalAlignment="Center" FontSize="13"/>
                                     <ContentPresenter Grid.Column="1" x:Name="AutoAppsPicker" ContentTemplate="{StaticResource ChoicePicker}"/>
                                 </Grid>
-                                <Grid Margin="0,0,0,12">
+                                <Grid Margin="0,0,0,14">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                                    <TextBlock Text="Games go to" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Games go to" VerticalAlignment="Center" FontSize="13"/>
                                     <ContentPresenter Grid.Column="1" x:Name="AutoGamesPicker" ContentTemplate="{StaticResource ChoicePicker}"/>
                                 </Grid>
-                                <CheckBox x:Name="AutoLive" Style="{StaticResource Switch}" Content="Also move running Chromium / Electron apps right away (Discord, browsers...)" Click="AutoLive_Click" Margin="0,0,0,14"/>
+                                <CheckBox x:Name="AutoLive" Style="{StaticResource Switch}" Content="Also move running Chromium / Electron apps right away (Discord, browsers...)" Click="AutoLive_Click" Margin="0,0,0,16"/>
                                 <StackPanel Orientation="Horizontal">
                                     <Button Content="Assign all installed apps now" Style="{StaticResource AccentButton}" Click="AssignInstalled_Click" Margin="0,0,8,0"/>
                                     <Button x:Name="UndoAuto" Content="Undo auto-assign" Click="UndoAuto_Click"/>
@@ -302,37 +371,45 @@
                             </StackPanel>
                         </Border>
 
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock Text="Startup" Style="{StaticResource H2}"/>
-                                <CheckBox x:Name="Autostart" Style="{StaticResource Switch}" Content="Start with Windows (in the tray, as admin, no UAC prompt)" Click="Autostart_Click" Margin="0,0,0,10"/>
-                                <CheckBox x:Name="ReturnApps" Style="{StaticResource Switch}" Content="When a GPU comes back on (force mode, Fortnite script...), move apps that belong on it back" Click="ReturnApps_Click"
+                                <CheckBox x:Name="Autostart" Style="{StaticResource Switch}" Content="Start with Windows (in the tray, as admin, no UAC prompt)" Click="Autostart_Click" Margin="0,4,0,12"/>
+                                <CheckBox x:Name="ReturnApps" Style="{StaticResource Switch}" Content="When a GPU comes back on (force mode, scripts...), move apps that belong on it back" Click="ReturnApps_Click"
                                           ToolTip="Chromium apps switch live. Other apps get restarted (tray apps force-closed). Games, launchers and terminals are left alone."/>
                             </StackPanel>
                         </Border>
 
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock Text="Safety" Style="{StaticResource H2}"/>
-                                <TextBlock Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,0,0,10"
+                                <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,14"
                                            Text="A GPU is only ever turned off for a few seconds and never the one your monitors are on. It always comes back: right after the action, from a separate watchdog if this app crashes, at the next start of this app, and at the latest after a reboot (the switch-off isn't saved by Windows)."/>
-                                <Button Content="Re-enable all GPUs now" Style="{StaticResource WarnButton}" HorizontalAlignment="Left" Click="EnableAll_Click"/>
+                                <Button HorizontalAlignment="Left" Click="EnableAll_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE72C;" Style="{StaticResource Glyph}" FontSize="12" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Re-enable all GPUs now"/>
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
                         </Border>
 
-                        <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10">
                             <StackPanel>
                                 <TextBlock Text="Live switching compatibility" Style="{StaticResource H2}"/>
-                                <TextBlock Style="{StaticResource SubText}" TextWrapping="Wrap" Margin="0,0,0,10"
+                                <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,12"
                                            Text="Windows can't move a running app to another GPU by itself, the app has to rebuild its graphics. Chromium / Electron apps can do that in both directions (only that app blinks). Some other apps survive their GPU being turned off and move away from it. Games don't. Results from 'Move everything off' get added here automatically."/>
                                 <ItemsControl x:Name="CompatList">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,3">
-                                                <Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition Width="200"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding Exe}" FontSize="13"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding Kind}" Foreground="{Binding Brush}" FontSize="13"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding Note}" Style="{StaticResource SubText}"/>
+                                            <Grid Margin="0,4">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition Width="210"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Exe}" FontSize="13" TextTrimming="CharacterEllipsis" Margin="0,0,10,0"/>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                    <Ellipse Width="7" Height="7" Fill="{Binding Brush}" Margin="0,1,8,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Kind}" FontSize="13"/>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{Binding Note}" Style="{StaticResource SubText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -340,12 +417,17 @@
                             </StackPanel>
                         </Border>
 
-                        <Button Content="Open log folder" HorizontalAlignment="Left" Click="OpenLogs_Click" Margin="0,0,0,10"/>
+                        <Button HorizontalAlignment="Left" Click="OpenLogs_Click" Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8B7;" Style="{StaticResource Glyph}" FontSize="12" Margin="0,0,8,0"/>
+                                <TextBlock Text="Open log folder"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
         </TabControl>
 
-        <TextBlock Grid.Row="3" x:Name="StatusText" Style="{StaticResource SubText}" Margin="2,8,0,0" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Grid.Row="3" x:Name="StatusText" Style="{StaticResource SubText}" Margin="2,10,0,0" TextTrimming="CharacterEllipsis"/>
     </Grid>
 </Window>

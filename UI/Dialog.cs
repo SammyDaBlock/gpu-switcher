@@ -20,8 +20,9 @@ public static class Dialog
         win.Width = 480; win.Height = 560; win.MaxWidth = double.PositiveInfinity;
         string? result = null;
 
-        var root = new DockPanel { Margin = new Thickness(22, 18, 22, 18) };
-        var head = new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10) };
+        var outer = new DockPanel();
+        var root = new DockPanel { Margin = new Thickness(24, 20, 24, 16) };
+        var head = new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.SemiBold, FontFamily = (FontFamily)app.FindResource("DisplayFont"), Margin = new Thickness(0, 0, 0, 14) };
         DockPanel.SetDock(head, Dock.Top);
         root.Children.Add(head);
 
@@ -29,19 +30,19 @@ public static class Dialog
         DockPanel.SetDock(search, Dock.Top);
         root.Children.Add(search);
 
-        var buttons = new DockPanel { Margin = new Thickness(0, 14, 0, 0) };
-        DockPanel.SetDock(buttons, Dock.Bottom);
+        var buttons = new DockPanel();
         var browse = new Button { Content = "Browse for a program…" };
         browse.Click += (_, _) => { result = "browse"; win.Close(); };
         buttons.Children.Add(browse);
         var right = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var cancel = new Button { Content = "Cancel", MinWidth = 80, Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
+        var cancel = new Button { Content = "Cancel", MinWidth = 96, Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
         cancel.Click += (_, _) => win.Close();
-        var add = new Button { Content = "Add", MinWidth = 80, IsDefault = true, IsEnabled = false, Style = (Style)app.FindResource("AccentButton") };
+        var add = new Button { Content = "Add", MinWidth = 96, IsDefault = true, IsEnabled = false, Style = (Style)app.FindResource("AccentButton") };
         right.Children.Add(cancel);
         right.Children.Add(add);
         buttons.Children.Add(right);
-        root.Children.Add(buttons);
+        outer.Children.Add(Footer(buttons));
+        outer.Children.Add(root);
 
         var list = new ListBox();
         root.Children.Add(list);
@@ -52,9 +53,10 @@ public static class Dialog
             foreach (var c in apps.Where(c => q.Length == 0 || c.Name.Contains(q, StringComparison.OrdinalIgnoreCase) || c.Exe.Contains(q, StringComparison.OrdinalIgnoreCase)))
             {
                 var row = new DockPanel { Tag = c.Exe, ToolTip = c.Exe };
-                var icon = new Image { Source = Look.IconFor(c.Exe), Width = 20, Height = 20, Margin = new Thickness(0, 0, 10, 0) };
+                var icon = new Image { Source = Look.IconFor(c.Exe), Width = 20, Height = 20, Margin = new Thickness(0, 0, 12, 0) };
+                RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
                 row.Children.Add(icon);
-                var badge = new TextBlock { Text = c.Running ? "running" : "", Foreground = (Brush)app.FindResource("Sub"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+                var badge = new TextBlock { Text = c.Running ? "running" : "", Foreground = Look.Ok, FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
                 DockPanel.SetDock(badge, Dock.Right);
                 row.Children.Add(badge);
                 row.Children.Add(new TextBlock { Text = c.Name, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
@@ -68,7 +70,7 @@ public static class Dialog
         add.Click += (_, _) => Pick();
         list.MouseDoubleClick += (_, _) => Pick();
 
-        win.Content = root;
+        win.Content = outer;
         win.Loaded += (_, _) => search.Focus();
         win.ShowDialog();
         return result;
@@ -87,16 +89,37 @@ public static class Dialog
             SizeToContent = SizeToContent.WidthAndHeight,
             Background = (Brush)app.FindResource("Panel"),
             Foreground = (Brush)app.FindResource("Text"),
-            BorderBrush = (Brush)app.FindResource("Line"),
-            BorderThickness = new Thickness(1),
+            FontFamily = (FontFamily)app.FindResource("UiFont"),
+            // Windows 11 draws its own rounded border + shadow; a WPF border would get its corners cut off
+            BorderBrush = (Brush)app.FindResource("LineStrong"),
+            BorderThickness = new Thickness(Theme.MicaSupported ? 0 : 1),
             ShowInTaskbar = owner == null,
             Topmost = owner == null,
             WindowStartupLocation = owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen,
             Owner = owner,
-            MaxWidth = 520,
+            MaxWidth = 540,
+            MinWidth = 340,
         };
+        TextOptions.SetTextFormattingMode(win, TextFormattingMode.Display);
+        win.SourceInitialized += (_, _) => Theme.RoundCorners(new System.Windows.Interop.WindowInteropHelper(win).Handle);
         win.MouseLeftButtonDown += (_, e) => { if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) win.DragMove(); };
         return win;
+    }
+
+    /// <summary>Button strip along the bottom, on a slightly different background (like Windows 11 dialogs).</summary>
+    static Border Footer(UIElement buttons)
+    {
+        var app = Application.Current;
+        var f = new Border
+        {
+            Background = (Brush)app.FindResource("DialogFooter"),
+            BorderBrush = (Brush)app.FindResource("Line"),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(24, 16, 24, 16),
+            Child = buttons,
+        };
+        DockPanel.SetDock(f, Dock.Bottom);
+        return f;
     }
 
     static bool Show(string title, string message, string yes, string? no)
@@ -104,21 +127,24 @@ public static class Dialog
         var app = Application.Current;
         var win = NewWindow(title);
         bool result = false;
-        var root = new StackPanel { Margin = new Thickness(22, 18, 22, 18) };
-        root.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10) });
-        root.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, FontSize = 13, LineHeight = 19, Foreground = (Brush)app.FindResource("Sub") });
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
+        var outer = new DockPanel();
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         if (no != null)
         {
-            var bNo = new Button { Content = no, MinWidth = 80, Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
+            var bNo = new Button { Content = no, MinWidth = 96, Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
             bNo.Click += (_, _) => win.Close();
             buttons.Children.Add(bNo);
         }
-        var bYes = new Button { Content = yes, MinWidth = 80, IsDefault = true, Style = (Style)app.FindResource("AccentButton") };
+        var bYes = new Button { Content = yes, MinWidth = 96, IsDefault = true, Style = (Style)app.FindResource("AccentButton") };
         bYes.Click += (_, _) => { result = true; win.Close(); };
         buttons.Children.Add(bYes);
-        root.Children.Add(buttons);
-        win.Content = root;
+        outer.Children.Add(Footer(buttons));
+
+        var root = new StackPanel { Margin = new Thickness(24, 20, 24, 22) };
+        root.Children.Add(new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.SemiBold, FontFamily = (FontFamily)app.FindResource("DisplayFont"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
+        root.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, FontSize = 13, LineHeight = 20, Foreground = (Brush)app.FindResource("Sub") });
+        outer.Children.Add(root);
+        win.Content = outer;
         win.ShowDialog();
         return result;
     }
