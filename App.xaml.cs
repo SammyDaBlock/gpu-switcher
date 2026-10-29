@@ -68,6 +68,7 @@ public partial class App : Application
             }
             catch (Exception ex) { Log.Write("auto-assign: " + ex.Message); }
             try { GpuReturn.OnApps(apps); } catch (Exception ex) { Log.Write("gpu return: " + ex.Message); }
+            UI.Overlays.OnApps(apps);
             _window.PostData(apps, snap);
             UpdateTrayText(snap);
 
@@ -81,6 +82,8 @@ public partial class App : Application
         _monitor.Start();
 
         CreateTray();
+        UI.Overlays.Notify += msg => Balloon(msg);
+        UI.Overlays.Start();
         ListenForShow();
 
         bool tray = args.Contains("--tray");
@@ -134,6 +137,8 @@ public partial class App : Application
             var n = await Task.Run(DeviceGuard.EnableAllGpus);
             Balloon(n == 0 ? "All GPUs are already on." : $"Re-enabled {n} GPU(s).");
         });
+        menu.Items.Add($"Performance overlay on/off  ({UI.Overlays.PerfKeys})", null, (_, _) => UI.Overlays.TogglePerf());
+        menu.Items.Add($"Reveal / cover money  ({UI.Overlays.RevealKeys})", null, (_, _) => UI.Overlays.ToggleReveal());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApp());
         UI.TrayMenuRenderer.Style(menu);
@@ -188,6 +193,7 @@ public partial class App : Application
             Balloon("Waiting for the GPU to come back on before exiting…");
             while (DeviceGuard.IsBusy) await Task.Delay(200);
         }
+        UI.Overlays.Shutdown();
         _monitor?.Dispose();
         _force?.Dispose();
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
@@ -421,6 +427,26 @@ public partial class App : Application
             case "--restore-startup":
                 StartupManager.GiveBackAll();
                 return true;
+
+            // --test-overlay <out> [seconds]: what the performance overlay would read (sensors, specs, FPS per process)
+            case "--test-overlay":
+            {
+                Gpus.Refresh();
+                var sb = new StringBuilder();
+                Sensors.Sample(); Thread.Sleep(1000); Sensors.Sample();
+                foreach (var g in Gpus.All) sb.AppendLine($"gpu {g.ShortName} key={g.Key} nvml={Sensors.Gpu.GetValueOrDefault(g.Key)?.ToString() ?? "none"}");
+                foreach (var k in Sensors.Gpu.Keys.Where(k => Gpus.ByKey(k) == null)) sb.AppendLine($"nvml key with no matching GPU: {k}");
+                sb.AppendLine($"cpu={Sensors.CpuPercent:0.0}% ram={Sensors.RamUsed >> 20}/{Sensors.RamTotal >> 20} MB");
+                while (SpecSheet.Current == null) Thread.Sleep(100);
+                sb.AppendLine($"specs: {SpecSheet.Current}");
+                FrameCounter.Start();
+                Thread.Sleep((args.Length > 2 ? int.Parse(args[2]) : 5) * 1000);
+                foreach (var p in System.Diagnostics.Process.GetProcesses())
+                    if (FrameCounter.For(p.Id) is { } f) sb.AppendLine($"fps {p.ProcessName} ({p.Id}): {f}");
+                FrameCounter.Stop();
+                File.WriteAllText(args[1], sb.ToString());
+                return true;
+            }
 
             case "--recover":
                 Gpus.Refresh();

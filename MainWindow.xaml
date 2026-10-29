@@ -1,6 +1,7 @@
 ﻿<Window x:Class="GpuSwitcher.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:GpuSwitcher.UI"
         Title="GPU Switcher" Width="1200" Height="780" MinWidth="1080" MinHeight="560"
         Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}" FontFamily="{StaticResource UiFont}"
         WindowStartupLocation="CenterScreen" TextOptions.TextFormattingMode="Display" UseLayoutRounding="True">
@@ -69,7 +70,7 @@
                                     </Border>
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                 </DockPanel>
-                                <ProgressBar Style="{StaticResource Meter}" Value="{Binding Util, Mode=OneWay}" Maximum="100" Foreground="{Binding Brush}" Margin="0,10,0,8"/>
+                                <ProgressBar Style="{StaticResource Meter}" ui:Anim.SmoothValue="{Binding Util, Mode=OneWay}" Maximum="100" Foreground="{Binding Brush}" Margin="0,10,0,8"/>
                                 <DockPanel>
                                     <TextBlock Text="{Binding State}" Foreground="{Binding StateBrush}" DockPanel.Dock="Right" FontSize="12"/>
                                     <TextBlock Style="{StaticResource SubText}">
@@ -361,6 +362,114 @@
                         </DockPanel>
                     </Border>
                 </DockPanel>
+            </TabItem>
+
+            <!-- ================= OVERLAYS ================= -->
+            <TabItem Header="Overlays">
+                <ScrollViewer x:Name="OverlaysScroll" VerticalScrollBarVisibility="Auto">
+                    <StackPanel MaxWidth="900" HorizontalAlignment="Left" Margin="0,0,10,0">
+                        <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,12"
+                                   Text="Click-through windows on top of your games, nothing gets injected into the game. They show over borderless and windowed games; exclusive fullscreen skips the desktop, so pick 'Windowed fullscreen' / 'Borderless' in the game's settings. The hotkeys work from inside games."/>
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10">
+                            <StackPanel>
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Right" Style="{StaticResource Chip}" ToolTip="Turns the overlay on and off, also from inside a game">
+                                        <TextBlock x:Name="PerfKeysText" FontSize="11" Foreground="{DynamicResource Sub}"/>
+                                    </Border>
+                                    <TextBlock Text="Performance overlay" Style="{StaticResource H2}"/>
+                                </DockPanel>
+                                <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,14"
+                                           Text="FPS, GPU and CPU numbers and your PC's specs on the screen the game is on (or one display you pick). FPS works for DirectX games (most of them); OpenGL and Vulkan games show '-'. Temperatures, clocks, power and fan need an NVIDIA card."/>
+                                <CheckBox x:Name="PerfOn" Style="{StaticResource Switch}" Content="Show the overlay" Click="PerfOn_Click" Margin="0,0,0,14"/>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Position" VerticalAlignment="Center" FontSize="13"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <ContentPresenter x:Name="PerfCornerPicker" ContentTemplate="{StaticResource ChoicePicker}"/>
+                                        <Button x:Name="PerfMoveButton" Style="{StaticResource SmallButton}" Margin="10,0,0,0" VerticalAlignment="Center" Click="PerfMove_Click"
+                                                ToolTip="Drag the overlay anywhere on the screen. Double-click or right-click it when it's in place."/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Display" VerticalAlignment="Center" FontSize="13"/>
+                                    <ContentPresenter Grid.Column="1" x:Name="PerfMonitorPicker" ContentTemplate="{StaticResource ChoicePicker}"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Size" VerticalAlignment="Center" FontSize="13"/>
+                                    <ContentPresenter Grid.Column="1" x:Name="PerfSizePicker" ContentTemplate="{StaticResource ChoicePicker}"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Background" VerticalAlignment="Center" FontSize="13"/>
+                                    <ContentPresenter Grid.Column="1" x:Name="PerfBgPicker" ContentTemplate="{StaticResource ChoicePicker}"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="GPUs" VerticalAlignment="Center" FontSize="13"/>
+                                    <ContentPresenter Grid.Column="1" x:Name="PerfGpuPicker" ContentTemplate="{StaticResource ChoicePicker}"/>
+                                </Grid>
+                                <TextBlock Text="Show" Style="{StaticResource Caption}" Margin="0,0,0,8"/>
+                                <ItemsControl x:Name="PerfItemsList" Margin="0,0,0,14">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="3"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Style="{StaticResource Switch}" Content="{Binding Label}" IsChecked="{Binding On}" Tag="{Binding Key}" Click="PerfItem_Click" Margin="0,0,0,10"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="Spec sheet" Style="{StaticResource Caption}" Margin="0,0,0,8"/>
+                                <ItemsControl x:Name="PerfSpecList">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="3"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Style="{StaticResource Switch}" Content="{Binding Label}" IsChecked="{Binding On}" Tag="{Binding Key}" Click="PerfItem_Click" Margin="0,0,0,10"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource Card}" Margin="0,0,0,10">
+                            <StackPanel>
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <Border Style="{StaticResource Chip}" Margin="0,0,6,0" ToolTip="Place covers: press it while the game is in front">
+                                            <TextBlock x:Name="EditKeysText" FontSize="11" Foreground="{DynamicResource Sub}"/>
+                                        </Border>
+                                        <Border Style="{StaticResource Chip}" ToolTip="Reveal the money (and cover it again)">
+                                            <TextBlock x:Name="RevealKeysText" FontSize="11" Foreground="{DynamicResource Sub}"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="Money covers" Style="{StaticResource H2}"/>
+                                </DockPanel>
+                                <TextBlock x:Name="CoversHelp" Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,14"/>
+                                <CheckBox x:Name="CoversOn" Style="{StaticResource Switch}" Content="Covers on (off = money revealed)" Click="CoversOn_Click" Margin="0,0,0,14"/>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Color" VerticalAlignment="Center" FontSize="13"/>
+                                    <ContentPresenter Grid.Column="1" x:Name="CoverColorPicker" ContentTemplate="{StaticResource ChoicePicker}"/>
+                                </Grid>
+                                <CheckBox x:Name="CoverLabel" Style="{StaticResource Switch}" Content="Show ??? on the covers" Click="CoverLabel_Click" Margin="0,4,0,16"/>
+                                <TextBlock Text="Games with covers" Style="{StaticResource Caption}" Margin="0,0,0,6"/>
+                                <ItemsControl x:Name="CoverGamesList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,3">
+                                                <Button DockPanel.Dock="Right" Content="Remove" Style="{StaticResource SmallButton}" Tag="{Binding Exe}" Click="RemoveCovers_Click"/>
+                                                <TextBlock Text="{Binding Exe}" FontSize="13" VerticalAlignment="Center" Width="260" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Detail}" Style="{StaticResource SubText}" VerticalAlignment="Center"/>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="NoCoverGames" Style="{StaticResource SubText}" Text="None yet." FontSize="13"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <!-- ================= SETTINGS ================= -->

@@ -16,6 +16,14 @@
 
             <!-- no Foreground here: an app-wide TextBlock style would override button/template colors.
                  Text color comes from Window.Foreground instead. -->
+            <!-- motion: hover / selection fades. Templates name their overlays "hover" / "sel".
+                 Triggers also set the end value, so the state is right even before an animation ran. -->
+            <CubicEase x:Key="EaseOut" EasingMode="EaseOut"/>
+            <Storyboard x:Key="HoverIn"><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12"/></Storyboard>
+            <Storyboard x:Key="HoverOut"><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.25"/></Storyboard>
+            <Storyboard x:Key="SelIn"><DoubleAnimation Storyboard.TargetName="sel" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.18" EasingFunction="{StaticResource EaseOut}"/></Storyboard>
+            <Storyboard x:Key="SelOut"><DoubleAnimation Storyboard.TargetName="sel" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.22" EasingFunction="{StaticResource EaseOut}"/></Storyboard>
+
             <Style TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
             </Style>
@@ -53,13 +61,17 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
-                            <Border x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4" Padding="{TemplateBinding Padding}">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
+                            <Grid>
+                                <Border x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <Border x:Name="hover" Background="{DynamicResource SubtleHover}" CornerRadius="4" Opacity="0" IsHitTestVisible="False"/>
+                            </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="b" Property="Background" Value="{DynamicResource ControlHover}"/>
+                                    <Trigger.EnterActions><BeginStoryboard Storyboard="{StaticResource HoverIn}"/></Trigger.EnterActions>
+                                    <Trigger.ExitActions><BeginStoryboard Storyboard="{StaticResource HoverOut}"/></Trigger.ExitActions>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
                                     <Setter TargetName="b" Property="Background" Value="{DynamicResource ControlPressed}"/>
@@ -85,18 +97,21 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
-                            <Border x:Name="b" Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
+                            <Grid x:Name="root">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="4"/>
+                                <Border x:Name="hover" Background="{DynamicResource PrimaryHover}" CornerRadius="4" Opacity="0"/>
+                                <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="b" Property="Background" Value="{DynamicResource PrimaryHover}"/>
+                                    <Trigger.EnterActions><BeginStoryboard Storyboard="{StaticResource HoverIn}"/></Trigger.EnterActions>
+                                    <Trigger.ExitActions><BeginStoryboard Storyboard="{StaticResource HoverOut}"/></Trigger.ExitActions>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="b" Property="Opacity" Value="0.8"/>
+                                    <Setter TargetName="root" Property="Opacity" Value="0.8"/>
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
-                                    <Setter TargetName="b" Property="Opacity" Value="0.4"/>
+                                    <Setter TargetName="root" Property="Opacity" Value="0.4"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -129,7 +144,8 @@
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="hover" Property="Opacity" Value="1"/>
+                                    <Trigger.EnterActions><BeginStoryboard Storyboard="{StaticResource HoverIn}"/></Trigger.EnterActions>
+                                    <Trigger.ExitActions><BeginStoryboard Storyboard="{StaticResource HoverOut}"/></Trigger.ExitActions>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
                                     <Setter TargetName="b" Property="Opacity" Value="0.7"/>
@@ -149,16 +165,21 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
-                            <Border x:Name="b" Background="Transparent" CornerRadius="4" Padding="10,4" Margin="1" MinWidth="44">
-                                <ContentPresenter HorizontalAlignment="Center"/>
-                            </Border>
+                            <Grid Margin="1" MinWidth="44">
+                                <Border x:Name="hover" Background="{DynamicResource SubtleHover}" CornerRadius="4" Opacity="0"/>
+                                <Border x:Name="sel" Background="{Binding SelectedBrush}" CornerRadius="4" Opacity="0"/>
+                                <ContentPresenter Margin="10,4" HorizontalAlignment="Center"/>
+                            </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="b" Property="Background" Value="{DynamicResource SubtleHover}"/>
+                                    <Trigger.EnterActions><BeginStoryboard Storyboard="{StaticResource HoverIn}"/></Trigger.EnterActions>
+                                    <Trigger.ExitActions><BeginStoryboard Storyboard="{StaticResource HoverOut}"/></Trigger.ExitActions>
                                     <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                                 </Trigger>
                                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter TargetName="b" Property="Background" Value="{Binding SelectedBrush}"/>
+                                    <DataTrigger.EnterActions><BeginStoryboard Storyboard="{StaticResource SelIn}"/></DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions><BeginStoryboard Storyboard="{StaticResource SelOut}"/></DataTrigger.ExitActions>
+                                    <Setter TargetName="sel" Property="Opacity" Value="1"/>
                                     <Setter Property="Foreground" Value="{DynamicResource OnFill}"/>
                                     <Setter Property="FontWeight" Value="SemiBold"/>
                                 </DataTrigger>
@@ -178,24 +199,49 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="CheckBox">
                             <StackPanel Orientation="Horizontal" Background="Transparent">
-                                <Border x:Name="track" Width="40" Height="20" CornerRadius="10" Background="{DynamicResource Control}"
-                                        BorderBrush="{DynamicResource Sub}" BorderThickness="1" VerticalAlignment="Center">
-                                    <Ellipse x:Name="knob" Width="12" Height="12" Fill="{DynamicResource Sub}" HorizontalAlignment="Left" Margin="3,0"/>
-                                </Border>
+                                <!-- the knob slides (Margin), the filled track and dark knob fade in on top -->
+                                <Grid Width="40" Height="20" VerticalAlignment="Center">
+                                    <Border CornerRadius="10" Background="{DynamicResource Control}" BorderBrush="{DynamicResource Sub}" BorderThickness="1"/>
+                                    <Border x:Name="hover" CornerRadius="10" Background="{DynamicResource SubtleHover}" Opacity="0"/>
+                                    <Border x:Name="fill" CornerRadius="10" Background="{DynamicResource Primary}" Opacity="0"/>
+                                    <Grid x:Name="slide" Width="18" Height="18" HorizontalAlignment="Left" Margin="1,0,0,0">
+                                        <Ellipse x:Name="knob" Width="12" Height="12" Fill="{DynamicResource Sub}"/>
+                                        <Ellipse x:Name="knobOn" Width="12" Height="12" Fill="{DynamicResource OnFill}" Opacity="0"/>
+                                    </Grid>
+                                </Grid>
                                 <ContentPresenter Margin="12,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions><BeginStoryboard Storyboard="{StaticResource HoverIn}"/></Trigger.EnterActions>
+                                    <Trigger.ExitActions><BeginStoryboard Storyboard="{StaticResource HoverOut}"/></Trigger.ExitActions>
                                     <Setter TargetName="knob" Property="Width" Value="14"/>
                                     <Setter TargetName="knob" Property="Height" Value="14"/>
-                                    <Setter TargetName="knob" Property="Margin" Value="2,0"/>
-                                    <Setter TargetName="track" Property="Background" Value="{DynamicResource ControlHover}"/>
+                                    <Setter TargetName="knobOn" Property="Width" Value="14"/>
+                                    <Setter TargetName="knobOn" Property="Height" Value="14"/>
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="track" Property="Background" Value="{DynamicResource Primary}"/>
-                                    <Setter TargetName="track" Property="BorderBrush" Value="{DynamicResource Primary}"/>
-                                    <Setter TargetName="knob" Property="Fill" Value="{DynamicResource OnFill}"/>
-                                    <Setter TargetName="knob" Property="HorizontalAlignment" Value="Right"/>
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <ThicknessAnimation Storyboard.TargetName="slide" Storyboard.TargetProperty="Margin" To="21,0,0,0" Duration="0:0:0.2" EasingFunction="{StaticResource EaseOut}"/>
+                                                <DoubleAnimation Storyboard.TargetName="fill" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.16"/>
+                                                <DoubleAnimation Storyboard.TargetName="knobOn" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.16"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <ThicknessAnimation Storyboard.TargetName="slide" Storyboard.TargetProperty="Margin" To="1,0,0,0" Duration="0:0:0.2" EasingFunction="{StaticResource EaseOut}"/>
+                                                <DoubleAnimation Storyboard.TargetName="fill" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.16"/>
+                                                <DoubleAnimation Storyboard.TargetName="knobOn" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.16"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                    <Setter TargetName="slide" Property="Margin" Value="21,0,0,0"/>
+                                    <Setter TargetName="fill" Property="Opacity" Value="1"/>
+                                    <Setter TargetName="knobOn" Property="Opacity" Value="1"/>
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter Property="Opacity" Value="0.35"/>
@@ -294,7 +340,7 @@
                         <ControlTemplate TargetType="TabControl">
                             <DockPanel>
                                 <TabPanel DockPanel.Dock="Top" IsItemsHost="True" Margin="-12,0,0,14"/>
-                                <ContentPresenter ContentSource="SelectedContent"/>
+                                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"/>
                             </DockPanel>
                         </ControlTemplate>
                     </Setter.Value>
@@ -308,20 +354,27 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="TabItem">
-                            <Grid Margin="0,0,2,0">
-                                <Border x:Name="b" Padding="12,7,12,9" CornerRadius="4" Background="Transparent">
-                                    <ContentPresenter ContentSource="Header"/>
-                                </Border>
-                                <Border x:Name="pill" Height="3" Width="16" CornerRadius="1.5" VerticalAlignment="Bottom" Margin="0,0,0,1"
-                                        Background="{DynamicResource Text}" Visibility="Hidden"/>
+                            <Grid Margin="0,0,2,0" Background="Transparent">
+                                <Border x:Name="hover" CornerRadius="4" Background="{DynamicResource SubtleHover}" Opacity="0"/>
+                                <ContentPresenter ContentSource="Header" Margin="12,7,12,9"/>
+                                <!-- the pill grows out from the middle when selected -->
+                                <Border x:Name="pill" Height="3" Width="0" CornerRadius="1.5" VerticalAlignment="Bottom" Margin="0,0,0,1"
+                                        Background="{DynamicResource Text}"/>
                             </Grid>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="b" Property="Background" Value="{DynamicResource SubtleHover}"/>
+                                    <Trigger.EnterActions><BeginStoryboard Storyboard="{StaticResource HoverIn}"/></Trigger.EnterActions>
+                                    <Trigger.ExitActions><BeginStoryboard Storyboard="{StaticResource HoverOut}"/></Trigger.ExitActions>
                                     <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                                 </Trigger>
                                 <Trigger Property="IsSelected" Value="True">
-                                    <Setter TargetName="pill" Property="Visibility" Value="Visible"/>
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="pill" Storyboard.TargetProperty="Width" To="16" Duration="0:0:0.25" EasingFunction="{StaticResource EaseOut}"/></Storyboard></BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="pill" Storyboard.TargetProperty="Width" To="0" Duration="0:0:0.15"/></Storyboard></BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                    <Setter TargetName="pill" Property="Width" Value="16"/>
                                     <Setter Property="Foreground" Value="{DynamicResource Text}"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
@@ -338,19 +391,40 @@
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ListBoxItem">
-                            <Grid Margin="0,1">
-                                <Border x:Name="b" Background="Transparent" CornerRadius="4" Padding="10,7">
-                                    <ContentPresenter/>
-                                </Border>
-                                <Border x:Name="bar" Width="3" Height="16" CornerRadius="1.5" HorizontalAlignment="Left" Background="{DynamicResource Text}" Visibility="Hidden"/>
+                            <Grid x:Name="row" Margin="0,1" Background="Transparent">
+                                <Border x:Name="hover" Background="{DynamicResource SubtleHover}" CornerRadius="4" Opacity="0"/>
+                                <Border x:Name="sel" Background="{DynamicResource SubtleSelected}" CornerRadius="4" Opacity="0"/>
+                                <ContentPresenter Margin="10,7"/>
+                                <Border x:Name="bar" Width="3" Height="0" CornerRadius="1.5" HorizontalAlignment="Left" Background="{DynamicResource Text}"/>
                             </Grid>
                             <ControlTemplate.Triggers>
+                                <!-- new rows (an app just started) fade in -->
+                                <EventTrigger RoutedEvent="Loaded">
+                                    <BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="row" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.25"/></Storyboard></BeginStoryboard>
+                                </EventTrigger>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="b" Property="Background" Value="{DynamicResource SubtleHover}"/>
+                                    <Trigger.EnterActions><BeginStoryboard Storyboard="{StaticResource HoverIn}"/></Trigger.EnterActions>
+                                    <Trigger.ExitActions><BeginStoryboard Storyboard="{StaticResource HoverOut}"/></Trigger.ExitActions>
                                 </Trigger>
                                 <Trigger Property="IsSelected" Value="True">
-                                    <Setter TargetName="b" Property="Background" Value="{DynamicResource SubtleSelected}"/>
-                                    <Setter TargetName="bar" Property="Visibility" Value="Visible"/>
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="sel" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.15"/>
+                                                <DoubleAnimation Storyboard.TargetName="bar" Storyboard.TargetProperty="Height" To="16" Duration="0:0:0.22" EasingFunction="{StaticResource EaseOut}"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="sel" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
+                                                <DoubleAnimation Storyboard.TargetName="bar" Storyboard.TargetProperty="Height" To="0" Duration="0:0:0.15"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                    <Setter TargetName="sel" Property="Opacity" Value="1"/>
+                                    <Setter TargetName="bar" Property="Height" Value="16"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>

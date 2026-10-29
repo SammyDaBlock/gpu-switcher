@@ -37,7 +37,7 @@ public static class Look
     public static Brush AutoBrush => R("Primary");
 
     /// <summary>GPU colors go by role, not by model: the GPU the monitors are on is always color 0, the others follow in order.</summary>
-    static int Role(string? key)
+    public static int Role(string? key)
     {
         if (key == null) return -1;
         var ordered = Gpus.All.OrderBy(g => g.IsDisplayGpu ? 0 : 1).ToList(); // stable, keeps Windows' order otherwise
@@ -71,24 +71,28 @@ public static class Look
 
     static readonly Dictionary<string, ImageSource?> IconCache = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Safe to call from any thread (the icon is frozen).</summary>
     public static ImageSource? IconFor(string path)
     {
-        if (IconCache.TryGetValue(path, out var img)) return img;
-        try
+        lock (IconCache)
         {
-            if (File.Exists(path))
+            if (IconCache.TryGetValue(path, out var img)) return img;
+            try
             {
-                using var ico = System.Drawing.Icon.ExtractAssociatedIcon(path);
-                if (ico != null)
+                if (File.Exists(path))
                 {
-                    var src = Imaging.CreateBitmapSourceFromHIcon(ico.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                    src.Freeze();
-                    img = src;
+                    using var ico = System.Drawing.Icon.ExtractAssociatedIcon(path);
+                    if (ico != null)
+                    {
+                        var src = Imaging.CreateBitmapSourceFromHIcon(ico.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                        src.Freeze();
+                        img = src;
+                    }
                 }
             }
+            catch { }
+            return IconCache[path] = img;
         }
-        catch { }
-        return IconCache[path] = img;
     }
 
     public static string Bytes(long b) => b >= 1L << 30 ? $"{b / (double)(1L << 30):0.0} GB" : $"{b >> 20} MB";
@@ -252,4 +256,18 @@ public class GpuCardVm : Vm
     Brush _stateBrush = Look.Sub; public Brush StateBrush { get => _stateBrush; set => Set(ref _stateBrush, value); }
     /// <summary>True while the Running list is filtered to this GPU (card gets its color).</summary>
     bool _sel; public bool IsSelected { get => _sel; set => Set(ref _sel, value); }
+}
+
+/// <summary>One on/off item in the Overlays tab (what the performance overlay shows).</summary>
+public class ToggleVm : Vm
+{
+    public required string Key { get; init; }
+    public required string Label { get; init; }
+    bool _on; public bool On { get => _on; set => Set(ref _on, value); }
+}
+
+public class CoverGameVm
+{
+    public required string Exe { get; init; }
+    public required string Detail { get; init; }
 }

@@ -102,6 +102,7 @@ public static class Dialog
         };
         TextOptions.SetTextFormattingMode(win, TextFormattingMode.Display);
         win.SourceInitialized += (_, _) => Theme.RoundCorners(new System.Windows.Interop.WindowInteropHelper(win).Handle);
+        win.Loaded += (_, _) => { if (win.Content is UIElement c) Anim.FadeUp(c, 6, 180); };
         win.MouseLeftButtonDown += (_, e) => { if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) win.DragMove(); };
         return win;
     }

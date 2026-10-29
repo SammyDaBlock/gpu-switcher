@@ -16,6 +16,60 @@ public class ForceRule
     public string Label { get; set; } = "";
 }
 
+/// <summary>One money cover, as fractions of the game window's client area (so it survives resolution changes).</summary>
+public class CoverRect
+{
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double W { get; set; }
+    public double H { get; set; }
+}
+
+public class OverlaySettings
+{
+    // ---- performance overlay ----
+    public bool PerfEnabled { get; set; }
+    /// <summary>TopLeft, TopRight, BottomLeft, BottomRight.</summary>
+    public string PerfCorner { get; set; } = "TopLeft";
+    /// <summary>Distance from PerfCorner's edges, in DIPs. Set by dragging the overlay.</summary>
+    public double PerfOffsetX { get; set; } = 14;
+    public double PerfOffsetY { get; set; } = 14;
+    /// <summary>Always on this display (device name like \\.\DISPLAY1). Null = the screen the game is on.</summary>
+    public string? PerfMonitor { get; set; }
+    /// <summary>0 small, 1 medium, 2 large.</summary>
+    public int PerfSize { get; set; } = 1;
+    /// <summary>0 clear (text only), 1 dim, 2 dark.</summary>
+    public int PerfBackground { get; set; } = 1;
+    /// <summary>Only this GPU's line. Null = all GPUs.</summary>
+    public string? PerfGpuKey { get; set; }
+    public HashSet<string> PerfItems { get; set; } = new(PerfOverlayItems.Defaults, StringComparer.OrdinalIgnoreCase);
+
+    // ---- money covers ----
+    /// <summary>exe name -> covers for that game.</summary>
+    public Dictionary<string, List<CoverRect>> Covers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Revealed: covers are off until switched back on.</summary>
+    public bool CoversRevealed { get; set; }
+    /// <summary>Black, Gray, Blue, Pink.</summary>
+    public string CoverColor { get; set; } = "Black";
+    public bool CoverLabel { get; set; } = true;
+}
+
+/// <summary>What the performance overlay can show. Keys are saved in settings.</summary>
+public static class PerfOverlayItems
+{
+    public static readonly (string Key, string Label)[] Performance =
+    {
+        ("fps", "FPS"), ("frametime", "Frame time"), ("low", "1% low FPS"), ("app", "Game + the GPU it's on"),
+        ("gpu-usage", "GPU usage"), ("gpu-temp", "GPU temperature"), ("gpu-clock", "GPU clock"), ("gpu-power", "GPU power"),
+        ("gpu-fan", "GPU fan"), ("gpu-vram", "VRAM"), ("cpu", "CPU usage"), ("ram", "RAM usage"), ("clock", "Time"),
+    };
+    public static readonly (string Key, string Label)[] Specs =
+    {
+        ("spec-cpu", "CPU"), ("spec-gpu", "GPUs"), ("spec-ram", "RAM"), ("spec-board", "Motherboard"), ("spec-os", "Windows"), ("spec-display", "Display"),
+    };
+    public static readonly string[] Defaults = { "fps", "frametime", "app", "gpu-usage", "gpu-temp", "gpu-vram", "cpu", "ram" };
+}
+
 public class AppSettings
 {
     // ---- auto-assign ----
@@ -46,6 +100,9 @@ public class AppSettings
     /// <summary>Explorer start time of the logon we last launched apps for.</summary>
     public string? LastStartupLogon { get; set; }
 
+    // ---- overlays ----
+    public OverlaySettings Overlay { get; set; } = new();
+
     static string FilePath => Path.Combine(Log.Dir, "settings.json");
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     static readonly object Gate = new();
@@ -63,6 +120,8 @@ public class AppSettings
                 s.AutoAssigned = new(s.AutoAssigned, StringComparer.OrdinalIgnoreCase);
                 s.ManualOverride = new(s.ManualOverride, StringComparer.OrdinalIgnoreCase);
                 s.CompatOverrides = new(s.CompatOverrides, StringComparer.OrdinalIgnoreCase);
+                s.Overlay.PerfItems = new(s.Overlay.PerfItems, StringComparer.OrdinalIgnoreCase);
+                s.Overlay.Covers = new(s.Overlay.Covers, StringComparer.OrdinalIgnoreCase);
                 return s;
             }
         }

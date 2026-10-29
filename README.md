@@ -22,7 +22,18 @@ Made for setups like an RTX 5070 for games + an RTX 3060 for Discord, browsers, 
 - **Auto-assign**: new apps get a default GPU, games get their own.
 - **Startup apps**: GPU Switcher can launch your startup apps itself, after their GPU choice is fixed (also right after they update into a new folder, like Discord).
 - Apps that update into a new version folder keep their GPU choice.
-- Windows 11 look: Mica, follows light/dark mode. The GPU your monitors are on is always blue, the second one orange.
+- Windows 11 look: Mica, follows light/dark mode, smooth animations. The GPU your monitors are on is always blue, the second one orange.
+
+### Overlays
+
+![Overlays tab](docs/screenshots/overlays-dark.png)
+
+Click-through windows on top of your games. Nothing is injected into the game.
+
+- **Performance overlay** (`Ctrl+Shift+F10`): FPS, frame time, 1% lows, the game and which GPU it's on, per-GPU usage / temperature / clock / power / fan / VRAM, CPU and RAM usage, the time, plus an optional spec sheet (CPU, GPUs, RAM, motherboard, Windows, display mode). Pick a corner or drag it anywhere ("Drag to place", double-click or right-click it when done), plus size, background and which GPUs to show. It follows the screen the game is on, or stays on one display you pick.
+- **Money covers**: blocks over the spots where a game shows your money, so you can grind without looking and get surprised at the end. Press `Ctrl+Shift+F12` in the game and drag boxes over the money (drag to move, corner to resize, ✕ or right-click to delete, Enter when done). Each game keeps its own covers and they only show while that game is in front. `Ctrl+Shift+F11` reveals the money, press it again to cover it back up.
+
+Limits: overlays show over **borderless / windowed** games, not exclusive fullscreen. FPS comes from DirectX's own frame events (like PresentMon), so it works for DirectX 9-12 games but not OpenGL / Vulkan ones. Temperature, clock, power and fan need an NVIDIA card. Every Roblox experience is the same exe, so they share one set of covers.
 
 ## Requirements
 

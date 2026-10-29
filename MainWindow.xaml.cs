@@ -25,6 +25,12 @@ public partial class MainWindow : Window
     readonly PickerOwner _autoApps = new() { Which = "apps" };
     readonly PickerOwner _autoGames = new() { Which = "games" };
     readonly PickerOwner _filter = new() { Which = "filter" };
+    readonly PickerOwner _ovCorner = new() { Which = "ov-corner" };
+    readonly PickerOwner _ovMonitor = new() { Which = "ov-monitor" };
+    readonly PickerOwner _ovSize = new() { Which = "ov-size" };
+    readonly PickerOwner _ovBg = new() { Which = "ov-bg" };
+    readonly PickerOwner _ovGpu = new() { Which = "ov-gpu" };
+    readonly PickerOwner _ovColor = new() { Which = "ov-color" };
     string? _filterKey;
     bool _fixing;
 
@@ -43,7 +49,8 @@ public partial class MainWindow : Window
             _activity.Insert(0, $"{DateTime.Now:HH:mm:ss}  {msg}");
             while (_activity.Count > 300) _activity.RemoveAt(_activity.Count - 1);
         });
-        DeviceGuard.BusyChanged += busy => Dispatcher.BeginInvoke(() => BusyBanner.Visibility = busy ? Visibility.Visible : Visibility.Collapsed);
+        DeviceGuard.BusyChanged += busy => Dispatcher.BeginInvoke(() => Anim.Show(BusyBanner, busy));
+        Overlays.Changed += () => { if (Tabs.SelectedIndex == 4) RefreshOverlays(); };
         Preferences.Changed += () => Dispatcher.BeginInvoke(() => { if (Tabs.SelectedIndex == 1) RefreshSaved(); });
         Tabs.SelectionChanged += (_, e) =>
         {
@@ -51,7 +58,10 @@ public partial class MainWindow : Window
             if (Tabs.SelectedIndex == 1) RefreshSaved();
             if (Tabs.SelectedIndex == 2) RefreshRules();
             if (Tabs.SelectedIndex == 3) RefreshStartup();
-            if (Tabs.SelectedIndex == 4) RefreshSettings();
+            if (Tabs.SelectedIndex == 4) RefreshOverlays();
+            if (Tabs.SelectedIndex == 5) RefreshSettings();
+            // new tab content slides in
+            if (Tabs.Template?.FindName("PART_SelectedContentHost", Tabs) is UIElement host) Anim.FadeUp(host, 8, 200);
         };
         SourceInitialized += (_, _) =>
         {
@@ -77,6 +87,7 @@ public partial class MainWindow : Window
             Theme.Refresh(); // may have switched while we were in the tray
             if (_themeDirty) RecolorAll();
             OnData(_lastApps, LiveSwitch.Monitor?.Latest ?? new GpuSnapshot());
+            if (Content is UIElement root) Anim.FadeUp(root, 14, 260);
         };
     }
 
@@ -99,7 +110,8 @@ public partial class MainWindow : Window
         foreach (var r in _rows) r.RaiseAll();
         if (Tabs.SelectedIndex == 1) RefreshSaved();
         if (Tabs.SelectedIndex == 3) RefreshStartup();
-        if (Tabs.SelectedIndex == 4) RefreshSettings();
+        if (Tabs.SelectedIndex == 4) RefreshOverlays();
+        if (Tabs.SelectedIndex == 5) RefreshSettings();
     }
 
     // ------------------------------------------------------------------ data
@@ -287,6 +299,11 @@ public partial class MainWindow : Window
 
             case PickerOwner { Which: "filter" }:
                 SetFilter(c.Key);
+                break;
+
+            case PickerOwner { Which: var w } p when w.StartsWith("ov-"):
+                OverlayPick(w, c.Key);
+                ChoiceVm.Select(p.Choices, c.Key);
                 break;
 
             case PickerOwner p:
@@ -495,19 +512,36 @@ public partial class MainWindow : Window
 
     // ------------------------------------------------------------------ tabs
 
-    void RefreshSaved()
+    int _savedVersion;
+
+    async void RefreshSaved()
     {
+        int version = ++_savedVersion;
+        // names, icons and file checks hit the disk for 100+ exes (seconds the first time), so not on the UI thread
+        var found = await Task.Run(() =>
+        {
+            try
+            {
+                return Preferences.All().OrderBy(x => Path.GetFileName(x.Exe), StringComparer.OrdinalIgnoreCase).Select(x =>
+                {
+                    bool isPath = x.Exe.Contains('\\');
+                    return (x.Exe, x.GpuKey, Name: isPath ? Apps.FriendlyName(x.Exe) : x.Exe, Icon: isPath ? Look.IconFor(x.Exe) : null, Missing: isPath && !File.Exists(x.Exe));
+                }).ToList();
+            }
+            catch (Exception ex) { Log.Write("saved choices: " + ex.Message); return null; }
+        });
+        if (found == null || version != _savedVersion) return; // a newer refresh is on its way (auto-assign changes lots at once)
+
         _saved.Clear();
         var auto = AppSettings.Current.AutoAssigned;
-        foreach (var (exe, key, _) in Preferences.All().OrderBy(x => Path.GetFileName(x.Exe), StringComparer.OrdinalIgnoreCase))
+        foreach (var (exe, key, name, icon, missingFile) in found)
         {
-            bool isPath = exe.Contains('\\');
             var row = new SavedRowVm
             {
                 ExePath = exe,
-                Name = isPath ? Apps.FriendlyName(exe) : exe,
-                Icon = isPath ? Look.IconFor(exe) : null,
-                Missing = isPath && !File.Exists(exe),
+                Name = name,
+                Icon = icon,
+                Missing = missingFile,
                 AutoAssigned = auto.ContainsKey(exe),
             };
             row.Choices = ChoiceVm.Build(row, true);
@@ -722,6 +756,112 @@ public partial class MainWindow : Window
             Exe = r.Exe, Kind = KindLabel(r.Entry.Kind), Note = r.Entry.Note,
             Brush = r.Entry.Kind switch { LiveKind.Chromium => Look.Ok, LiveKind.SurvivesDeviceLoss => Look.Warn, LiveKind.CrashesOnDeviceLoss => Look.Danger, _ => Look.Sub },
         }).ToList();
+    }
+
+    // ------------------------------------------------------------------ overlays
+
+    void RefreshOverlays()
+    {
+        var o = AppSettings.Current.Overlay;
+        PerfKeysText.Text = Overlays.PerfKeys;
+        EditKeysText.Text = "Place: " + Overlays.EditKeys;
+        RevealKeysText.Text = "Reveal: " + Overlays.RevealKeys;
+        PerfOn.IsChecked = o.PerfEnabled;
+        Picker(_ovCorner, PerfCornerPicker, new[] { ("TopLeft", "Top left"), ("TopRight", "Top right"), ("BottomLeft", "Bottom left"), ("BottomRight", "Bottom right") },
+               o.PerfOffsetX == 14 && o.PerfOffsetY == 14 ? o.PerfCorner : null); // dragged somewhere else: no corner lit up
+        PerfMoveButton.Content = Overlays.PerfMoving ? "Done" : "Drag to place";
+        var monitors = Overlays.Monitors().Select(m => (m.Device, $"{Overlays.MonitorName(m.Device)}{(m.Primary ? " (main)" : "")}")).ToList();
+        monitors.Insert(0, ("", "Follow the game"));
+        Picker(_ovMonitor, PerfMonitorPicker, monitors.ToArray(), o.PerfMonitor ?? "");
+        Picker(_ovSize, PerfSizePicker, new[] { ("0", "Small"), ("1", "Medium"), ("2", "Large") }, o.PerfSize.ToString());
+        Picker(_ovBg, PerfBgPicker, new[] { ("0", "None"), ("1", "See-through"), ("2", "Dark") }, o.PerfBackground.ToString());
+        _ovGpu.Choices = ChoiceVm.Build(_ovGpu, true, "All");
+        ChoiceVm.Select(_ovGpu.Choices, o.PerfGpuKey);
+        PerfGpuPicker.Content = null; PerfGpuPicker.Content = _ovGpu;
+        PerfItemsList.ItemsSource = PerfOverlayItems.Performance.Select(i => new ToggleVm { Key = i.Key, Label = i.Label, On = o.PerfItems.Contains(i.Key) }).ToList();
+        PerfSpecList.ItemsSource = PerfOverlayItems.Specs.Select(i => new ToggleVm { Key = i.Key, Label = i.Label, On = o.PerfItems.Contains(i.Key) }).ToList();
+
+        CoversOn.IsChecked = !o.CoversRevealed;
+        Picker(_ovColor, CoverColorPicker, new[] { ("Black", "Black"), ("Gray", "Gray"), ("Blue", "Blue"), ("Pink", "Pink") }, o.CoverColor);
+        CoverLabel.IsChecked = o.CoverLabel;
+        CoversHelp.Text = "Blocks over the spots where a game shows your money, so you can grind without looking and get surprised at the end. " +
+                          $"Open the game, press {Overlays.EditKeys} and drag boxes over the money. Each game keeps its own covers, they only show while that game is in front. " +
+                          $"{Overlays.RevealKeys} reveals the money, press it again to cover it back up. All Roblox experiences count as one game, so move the covers when you switch.";
+        var games = o.Covers.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(kv => new CoverGameVm { Exe = kv.Key, Detail = kv.Value.Count == 1 ? "1 cover" : $"{kv.Value.Count} covers" }).ToList();
+        CoverGamesList.ItemsSource = games;
+        NoCoverGames.Visibility = games.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    static void Picker(PickerOwner owner, ContentPresenter host, (string Key, string Label)[] items, string? selected)
+    {
+        owner.Choices = new(items.Select(i => new ChoiceVm { Label = i.Label, Key = i.Key, SelectedBrush = Look.AutoBrush, Owner = owner }));
+        ChoiceVm.Select(owner.Choices, selected);
+        host.Content = null; host.Content = owner;
+    }
+
+    void OverlayPick(string which, string? key)
+    {
+        var o = AppSettings.Current.Overlay;
+        switch (which)
+        {
+            case "ov-corner": o.PerfCorner = key ?? "TopLeft"; o.PerfOffsetX = o.PerfOffsetY = 14; break;
+            case "ov-monitor": o.PerfMonitor = string.IsNullOrEmpty(key) ? null : key; break;
+            case "ov-size": o.PerfSize = int.Parse(key ?? "1"); break;
+            case "ov-bg": o.PerfBackground = int.Parse(key ?? "1"); break;
+            case "ov-gpu": o.PerfGpuKey = key; break;
+            case "ov-color": o.CoverColor = key ?? "Black"; break;
+        }
+        AppSettings.Current.Save();
+        Overlays.Apply();
+    }
+
+    void PerfOn_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Current.Overlay.PerfEnabled = PerfOn.IsChecked == true;
+        AppSettings.Current.Save();
+        Overlays.Apply();
+        if (PerfOn.IsChecked == true) Status($"Overlay on. {Overlays.PerfKeys} turns it on and off from inside a game.");
+    }
+
+    void PerfMove_Click(object sender, RoutedEventArgs e)
+    {
+        Overlays.TogglePerfMove();
+        if (Overlays.PerfMoving) Status("Drag the overlay where you want it, then double-click or right-click it (or press Done).");
+        RefreshOverlays();
+    }
+
+    void PerfItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not ToggleVm t) return;
+        var items = AppSettings.Current.Overlay.PerfItems;
+        if (t.On) items.Add(t.Key); else items.Remove(t.Key);
+        AppSettings.Current.Save();
+        Overlays.Apply();
+    }
+
+    void CoversOn_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Current.Overlay.CoversRevealed = CoversOn.IsChecked != true;
+        AppSettings.Current.Save();
+        Overlays.Apply();
+    }
+
+    void CoverLabel_Click(object sender, RoutedEventArgs e)
+    {
+        AppSettings.Current.Overlay.CoverLabel = CoverLabel.IsChecked == true;
+        AppSettings.Current.Save();
+        Overlays.Apply();
+    }
+
+    void RemoveCovers_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not string exe) return;
+        if (!Dialog.Confirm("Remove the covers?", $"Deletes the money covers for {exe}.", "Remove", "Cancel")) return;
+        AppSettings.Current.Overlay.Covers.Remove(exe);
+        AppSettings.Current.Save();
+        Overlays.Apply();
+        RefreshOverlays();
     }
 
     // ------------------------------------------------------------------ settings handlers
