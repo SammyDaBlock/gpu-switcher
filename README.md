@@ -2,7 +2,7 @@
 
 A Windows tray app for PCs with **two (or more) GPUs**. See which GPU every app is running on, pick the GPU per app, and move apps between GPUs without digging through Windows settings.
 
-Made for setups like an RTX 5070 for games + an RTX 3060 for Discord, browsers, OBS and other background stuff.
+Made for setups like an RTX 5070 for games + an RTX 3060 for Discord, browsers, OBS and other background stuff. Built with AI ([details](#made-with-ai)).
 
 ![GPU Switcher, Running tab](docs/screenshots/running-dark.png)
 
@@ -76,6 +76,10 @@ To build the installer too, install [Inno Setup](https://jrsoftware.org/isinfo.p
 
 - Settings and logs: `%APPDATA%\GpuSwitcher`
 - Per-app GPU choices: Windows' own setting (`HKCU\Software\Microsoft\DirectX\UserGpuPreferences`), the same one Settings → Display → Graphics uses.
+
+## Made with AI
+
+Full transparency: I came up with the idea, decided what it should do and tested it on my own PC, but the code was written with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding tool. Every commit lists Claude as co-author. If you find a bug, please [open an issue](../../issues).
 
 ## License
 
