@@ -60,6 +60,8 @@ public partial class MainWindow
         PixelClock24.IsChecked = p.Clock24h;
         PixelClockSeconds.IsChecked = p.ClockSeconds;
         PixelPrinterKey.Text = PrinterLink();
+        PixelContrast.Value = p.MirrorContrast;
+        PixelContrastText.Text = $"{p.MirrorContrast}%";
         PixelAreaText.Text = p.MirrorRegion == null ? "Middle of the screen" : "Your own square";
         PixelAreaReset.Visibility = p.MirrorRegion == null ? Visibility.Collapsed : Visibility.Visible;
         PixelImageText.Text = string.IsNullOrEmpty(p.ImagePath) ? "No file yet" : System.IO.Path.GetFileName(p.ImagePath);
@@ -148,6 +150,14 @@ public partial class MainWindow
         if (_pxLoading || !IsLoaded) return;
         Px.Brightness = (int)Math.Round(PixelBrightness.Value);
         PixelBrightnessText.Text = $"{Px.Brightness}%";
+        SavePixel();
+    }
+
+    void PixelContrast_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_pxLoading || !IsLoaded) return;
+        Px.MirrorContrast = (int)Math.Round(PixelContrast.Value);
+        PixelContrastText.Text = $"{Px.MirrorContrast}%";
         SavePixel();
     }
 

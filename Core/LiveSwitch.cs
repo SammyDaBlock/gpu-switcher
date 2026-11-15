@@ -77,6 +77,7 @@ public static class LiveSwitch
     public static async Task<string> MoveChromium(string exePath, string targetKey)
     {
         var target = Gpus.ByKey(targetKey) ?? throw new InvalidOperationException("Unknown GPU.");
+        if (NoGpu.Is(exePath)) { Preferences.SetGpu(exePath, targetKey); return "Saved. GPU acceleration is off for this app, so it isn't moved now."; }
         var wait = WaitBeforeRestart(exePath);
         if (wait > TimeSpan.Zero)
             throw new InvalidOperationException($"{Path.GetFileName(exePath)} already restarted its GPU process twice in the last few minutes. " +
@@ -204,7 +205,12 @@ public static class LiveSwitch
         await Task.Delay(800);
         try
         {
-            Native.LaunchUnelevated(exePath, cmd, Path.GetDirectoryName(exePath));
+            try { Native.LaunchUnelevated(exePath, cmd, Path.GetDirectoryName(exePath)); }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 740 /* ERROR_ELEVATION_REQUIRED */)
+            {
+                // the app always runs as admin (so it did before we closed it too): start it from here, we're admin, no UAC prompt
+                Process.Start(new ProcessStartInfo(exePath, ArgsOf(cmd)) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exePath) })?.Dispose();
+            }
             Log.Write($"relaunched {Path.GetFileName(exePath)}");
             return $"Restarted on {Gpus.ByKey(targetKey)?.ShortName ?? "Auto"}.";
         }
@@ -214,6 +220,20 @@ public static class LiveSwitch
             return $"Closed it, but relaunching failed ({ex.Message}). Start it yourself, it'll use the new GPU.";
         }
     }
+
+    /// <summary>A full command line minus the exe at the front ("C:\x.exe" -a b -> -a b).</summary>
+    static string ArgsOf(string? cmd)
+    {
+        cmd = cmd?.TrimStart() ?? "";
+        if (cmd.StartsWith('"')) { int q = cmd.IndexOf('"', 1); return q < 0 ? "" : cmd[(q + 1)..].Trim(); }
+        int sp = cmd.IndexOf(' ');
+        return sp < 0 ? "" : cmd[(sp + 1)..].Trim();
+    }
+
+    /// <summary>True if a MoveChromium / RestartOnGpu result means the app is (or will be) on the new GPU.</summary>
+    public static bool Worked(string result) =>
+        result.StartsWith("Moved to") || result.StartsWith("Restarted on") || result.StartsWith("New GPU process started")
+        || result.EndsWith("once it does."); // no GPU process right now: the next one starts on the new GPU
 
     public static readonly HashSet<string> Terminals = new(StringComparer.OrdinalIgnoreCase)
         { "WindowsTerminal.exe", "OpenConsole.exe", "conhost.exe", "cmd.exe", "powershell.exe", "pwsh.exe", "wezterm-gui.exe", "alacritty.exe" };

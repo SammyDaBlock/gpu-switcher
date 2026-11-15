@@ -182,6 +182,9 @@ public class AppRowVm : Vm
     bool _force; public bool Force { get => _force; set => Set(ref _force, value); }
     bool _forceAllowed; public bool ForceAllowed { get => _forceAllowed; set => Set(ref _forceAllowed, value); }
     string _forceTip = ""; public string ForceTip { get => _forceTip; set => Set(ref _forceTip, value); }
+    // GPU acceleration switch (Chromium / Electron apps only, see NoGpu)
+    bool _accelOn; public bool AccelOn { get => _accelOn; set => Set(ref _accelOn, value); }
+    Visibility _accelVisible = Visibility.Collapsed; public Visibility AccelVisible { get => _accelVisible; set => Set(ref _accelVisible, value); }
 
     public void RefreshActionText() => Raise(nameof(ActionText));
 }

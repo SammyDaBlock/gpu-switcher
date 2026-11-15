@@ -1,6 +1,10 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
+// We run as admin: every DLL we P/Invoke (incl. nvml.dll from the NVIDIA driver) loads from System32 only,
+// never from a user-writable folder on PATH.
+[assembly: DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+
 namespace GpuSwitcher.Core;
 
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]

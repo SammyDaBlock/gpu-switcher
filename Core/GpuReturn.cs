@@ -52,13 +52,16 @@ public static class GpuReturn
         await Task.Delay(4000); // let the re-enabled card settle and the counters see its new LUID
         if (DeviceGuard.IsBusy || Gpus.ByKey(gpu.Key)?.IsDisabled != false) return;
         var gameRunning = AppSettings.Current.ForceRules.SelectMany(r => r.Triggers.Append(r.GameExe)).ToList();
-        var tasks = new List<Task<string?>>();
+        var tasks = new List<Task<(string Name, bool Ok, bool Retry)>>();
         foreach (var a in Apps.Build(LiveSwitch.Monitor!.Sample()))
         {
             if (!bumped.Contains(a.ExePath) || a.IsSystem) continue;
             if (string.Equals(a.ExePath, Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) continue; // never restart ourselves
             if (!string.Equals(Preferences.GetGpuKey(a.ExePath), gpu.Key, StringComparison.OrdinalIgnoreCase)) continue;
             if (a.PrimaryGpuKey == gpu.Key) continue;
+            // anti-cheat games and their in-game overlay stay where the game put them
+            if (AntiCheat.Is(a.ExePath) || a.ExeName.StartsWith("EOSOverlayRenderer", StringComparison.OrdinalIgnoreCase)) continue;
+            if (NoGpu.Is(a.ExePath)) continue; // GPU acceleration is off for it, nothing to move
             var kind = Compat.For(a.ExePath).Kind;
             if (kind != LiveKind.Chromium)
             {
@@ -71,20 +74,47 @@ public static class GpuReturn
             // all at once: one by one took over a minute (restarts are up to ~9 s each)
             tasks.Add(Task.Run(async () =>
             {
+                string result;
                 try
                 {
-                    if (kind == LiveKind.Chromium)
-                    {
-                        Log.Write($"returning {a.ExeName}: " + await LiveSwitch.MoveChromium(a.ExePath, gpu.Key));
-                        return a.DisplayName;
-                    }
-                    Log.Write($"returning {a.ExeName}: " + await LiveSwitch.RestartOnGpu(a.ExePath, gpu.Key, () => Task.FromResult(true)));
-                    return $"{a.DisplayName} (restarted)";
+                    result = kind == LiveKind.Chromium
+                        ? await LiveSwitch.MoveChromium(a.ExePath, gpu.Key)
+                        : await LiveSwitch.RestartOnGpu(a.ExePath, gpu.Key, () => Task.FromResult(true));
                 }
-                catch (Exception ex) { Log.Write($"returning {a.ExeName} failed: {ex.Message}"); return null; }
+                catch (Exception ex) { result = ex.Message; }
+                Log.Write($"returning {a.ExeName}: {result}");
+                bool ok = LiveSwitch.Worked(result), retry = !ok && kind == LiveKind.Chromium;
+                if (retry) _ = Task.Run(() => RetryChromium(a, gpu));
+                return (Name: kind == LiveKind.Chromium ? a.DisplayName : $"{a.DisplayName} (restarted)", Ok: ok, Retry: retry);
             }));
         }
-        var results = (await Task.WhenAll(tasks)).OfType<string>().ToList();
-        if (results.Count > 0) Notify?.Invoke($"{gpu.ShortName} is back on. Moved back to it: {string.Join(", ", results)}.");
+        var results = await Task.WhenAll(tasks);
+        if (results.Length == 0) return;
+        string Names(IEnumerable<string> names) => string.Join(", ", names);
+        var moved = results.Where(r => r.Ok).Select(r => r.Name).ToList();
+        var retrying = results.Where(r => r.Retry).Select(r => r.Name).ToList();
+        var failed = results.Where(r => !r.Ok && !r.Retry).Select(r => r.Name).ToList();
+        Notify?.Invoke($"{gpu.ShortName} is back on." +
+            (moved.Count > 0 ? $" Moved back to it: {Names(moved)}." : "") +
+            (retrying.Count > 0 ? $" Landed on the wrong GPU, trying again in a few minutes: {Names(retrying)}." : "") +
+            (failed.Count > 0 ? $" Couldn't move (see the log): {Names(failed)}." : ""));
+    }
+
+    /// <summary>
+    /// A Chromium app's new GPU process landed on the wrong card. Every GPU process restart counts towards Chromium's
+    /// "3 crashes and acceleration is off" limit, so wait until another one is safe, then try once more.
+    /// </summary>
+    static async Task RetryChromium(RunningApp a, GpuAdapter gpu)
+    {
+        await Task.Delay(LiveSwitch.WaitBeforeRestart(a.ExePath) + TimeSpan.FromSeconds(5));
+        if (DeviceGuard.IsBusy || Gpus.ByKey(gpu.Key)?.IsDisabled != false) return;
+        var now = Apps.Build(LiveSwitch.Monitor!.Sample()).FirstOrDefault(x => string.Equals(x.ExePath, a.ExePath, StringComparison.OrdinalIgnoreCase));
+        if (now == null || now.PrimaryGpuKey == gpu.Key) return; // closed, or got there by itself
+        if (!string.Equals(Preferences.GetGpuKey(a.ExePath), gpu.Key, StringComparison.OrdinalIgnoreCase)) return; // you changed it meanwhile
+        string result;
+        try { result = await LiveSwitch.MoveChromium(a.ExePath, gpu.Key); }
+        catch (Exception ex) { result = ex.Message; }
+        Log.Write($"returning {a.ExeName} (second try): {result}");
+        Notify?.Invoke(LiveSwitch.Worked(result) ? $"{a.DisplayName} is back on {gpu.ShortName} now." : $"{a.DisplayName} still didn't move to {gpu.ShortName}: {result}");
     }
 }

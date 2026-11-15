@@ -80,6 +80,8 @@ public class PixelSettings
     public string? MirrorMonitor { get; set; }
     /// <summary>Square part of that monitor, as fractions. Null = the middle square of the whole screen.</summary>
     public CoverRect? MirrorRegion { get; set; }
+    /// <summary>0 = the plain shrunk image, 100 = strongest levels stretch + saturation + sharpening.</summary>
+    public int MirrorContrast { get; set; } = 50;
 
     public string? ImagePath { get; set; }
 }
@@ -127,6 +129,9 @@ public class AppSettings
 
     public bool ShowSystemProcesses { get; set; }
 
+    /// <summary>Chromium/Electron apps (exe paths) whose GPU acceleration is switched off. See NoGpu.</summary>
+    public HashSet<string> NoGpuApps { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     // ---- startup apps ----
     public List<ManagedStartup> ManagedStartup { get; set; } = new();
     public bool StartupTakeOverNew { get; set; }
@@ -158,6 +163,7 @@ public class AppSettings
                 s.ManualOverride = new(s.ManualOverride, StringComparer.OrdinalIgnoreCase);
                 s.CompatOverrides = new(s.CompatOverrides, StringComparer.OrdinalIgnoreCase);
                 s.AntiCheatGames = new(s.AntiCheatGames, StringComparer.OrdinalIgnoreCase);
+                s.NoGpuApps = new(s.NoGpuApps, StringComparer.OrdinalIgnoreCase);
                 s.Overlay.PerfItems = new(s.Overlay.PerfItems, StringComparer.OrdinalIgnoreCase);
                 s.Overlay.Covers = new(s.Overlay.Covers, StringComparer.OrdinalIgnoreCase);
                 return s;

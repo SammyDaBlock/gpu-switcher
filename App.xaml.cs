@@ -76,8 +76,11 @@ public partial class App : Application
                 try { foreach (var note in StartupManager.Reconcile()) Balloon(note); } catch (Exception ex) { Log.Write("startup apps: " + ex.Message); }
 
             if (++_ticks % 20 == 1) // ~every 30 s
-                foreach (var exe in LiveSwitch.NewSoftwareFallbacks())
+            {
+                NoGpu.EnforceAll();
+                foreach (var exe in LiveSwitch.NewSoftwareFallbacks().Where(e => !NoGpu.Is(e))) // software on purpose: no warning
                     Balloon($"{Apps.FriendlyName(exe)} is running without GPU acceleration. If its GPU process restarted a lot, close and reopen it to get it back. If hardware acceleration is off in its settings, that's why.");
+            }
         };
         _monitor.Start();
 

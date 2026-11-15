@@ -192,7 +192,9 @@ public partial class MainWindow : Window
 
         var pref = Gpus.ByKey(row.PrefKey);
         var on = Gpus.ByKey(row.OnKey);
-        if (pref == null || on == null || pref.Key == on.Key || pref.IsDisabled) row.Action = RowAction.None;
+        row.AccelVisible = row.Kind == LiveKind.Chromium || NoGpu.Is(row.ExePath) ? Visibility.Visible : Visibility.Collapsed;
+        row.AccelOn = !NoGpu.Is(row.ExePath);
+        if (pref == null || on == null || pref.Key == on.Key || pref.IsDisabled || !row.AccelOn) row.Action = RowAction.None;
         else if (row.Kind == LiveKind.Chromium)
         {
             row.Action = RowAction.SwitchLive;
@@ -517,6 +519,23 @@ public partial class MainWindow : Window
             if (row.PrefKey == null) { Preferences.SetGpu(row.ExePath, target.Key); AutoAssign.MarkManual(row.ExePath); }
             s.Save();
             Status($"Force mode on: next time {row.Name} starts, {hide.ShortName} goes off until it has picked {target.ShortName}.", 12);
+        }
+        UpdateRowState(row);
+    }
+
+    async void Accel_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not AppRowVm row) return;
+        if (row.AccelOn)
+        {
+            Status($"Turning GPU acceleration off for {row.Name}...");
+            Status(await NoGpu.TurnOff(row.ExePath), 12);
+        }
+        else
+        {
+            if (!Dialog.Confirm($"Turn GPU acceleration back on for {row.Name}?", "It has to restart for that (Chromium apps never switch back while they're running).", "Restart it", "Cancel"))
+            { UpdateRowState(row); return; }
+            Status(await NoGpu.TurnOn(row.ExePath, () => Task.FromResult(true)), 12);
         }
         UpdateRowState(row);
     }

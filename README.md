@@ -19,6 +19,7 @@ Made for setups like an RTX 5070 for games + an RTX 3060 for Discord, browsers, 
   - Other apps get a one-click **"Restart on GPU X"**.
   - "Move everything off GPU X" turns the second GPU off for ~5 seconds so apps that can handle it move over by themselves.
 - **Force mode** for games that ignore every GPU setting (Fortnite / Unreal Engine games pick the GPU with the most VRAM). When the game starts, the other GPU is turned off until the game has picked its GPU, then turned back on. Nothing is injected into the game. Works for any game: add it from the Force mode tab, or flip its Force switch while it runs. Fortnite has a one-click preset.
+- **GPU acceleration off per app** (Chromium / Electron apps like Discord, browsers, Medal): the "GPU accel" switch makes the app render on the CPU, live without a restart (it blinks a few times), and keeps it that way every time the app starts. Turning it back on restarts the app.
 - **Auto-assign**: new apps get a default GPU, games get their own.
 - **Startup apps**: GPU Switcher can launch your startup apps itself, after their GPU choice is fixed (also right after they update into a new folder, like Discord).
 - Apps that update into a new version folder keep their GPU choice.
@@ -41,7 +42,7 @@ Drives the 32x32 round screen on a Cooler Master MasterLiquid Atmos II Pixel LED
 
 - **Clock**: 24h time on one line, spinning hearts, sparkles and a seconds dot running around the edge, any color.
 - **3D printer**: progress ring, % and time left for a Bambu printer, read from a self-hosted print app's TV feed on the home network. Flashes when a print is done or fails.
-- **Screen mirror**: a square of any monitor at up to 15 fps (Windows.Graphics.Capture, downscaled on the monitor's GPU, so it's cheap while gaming). Drag your own square or use the middle of the screen.
+- **Screen mirror**: a square of any monitor at up to 15 fps (Windows.Graphics.Capture, downscaled on the monitor's GPU, so it's cheap while gaming). Drag your own square or use the middle of the screen. A contrast slider stretches dark and bright apart, strengthens colors and sharpens edges, so bright screens don't blend together on 556 LEDs.
 - **GIF / image**: cropped to the middle square, GIFs play at their own speed.
 
 Brightness and rotation are in the tab. While it's on, Cooler Master's MasterCTRL service is stopped so the two don't fight over the screen; turning it off, exiting or uninstalling starts it again. Only the live-stream commands MasterCTRL itself sends are used, nothing that writes to the pump's flash.

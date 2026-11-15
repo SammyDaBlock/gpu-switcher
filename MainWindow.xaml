@@ -142,7 +142,7 @@
                             <Grid DockPanel.Dock="Top" Margin="10,0,18,6">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="116"/><ColumnDefinition Width="62"/>
-                                    <ColumnDefinition Width="76"/><ColumnDefinition Width="Auto" MinWidth="206" SharedSizeGroup="Pick"/><ColumnDefinition Width="150"/><ColumnDefinition Width="132"/><ColumnDefinition Width="56"/>
+                                    <ColumnDefinition Width="76"/><ColumnDefinition Width="Auto" MinWidth="206" SharedSizeGroup="Pick"/><ColumnDefinition Width="150"/><ColumnDefinition Width="132"/><ColumnDefinition Width="56"/><ColumnDefinition Width="72"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="1" Text="App" Style="{StaticResource Caption}"/>
                                 <TextBlock Grid.Column="2" Text="Running on" Style="{StaticResource Caption}"/>
@@ -151,6 +151,7 @@
                                 <TextBlock Grid.Column="5" Text="Use GPU" Style="{StaticResource Caption}"/>
                                 <TextBlock Grid.Column="6" Text="Switching" Style="{StaticResource Caption}"/>
                                 <TextBlock Grid.Column="8" Text="Force" Style="{StaticResource Caption}"/>
+                                <TextBlock Grid.Column="9" Text="GPU accel" Style="{StaticResource Caption}"/>
                             </Grid>
 
                             <ListBox x:Name="RunningList">
@@ -159,7 +160,7 @@
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="116"/><ColumnDefinition Width="62"/>
-                                                <ColumnDefinition Width="76"/><ColumnDefinition Width="Auto" MinWidth="206" SharedSizeGroup="Pick"/><ColumnDefinition Width="150"/><ColumnDefinition Width="132"/><ColumnDefinition Width="56"/>
+                                                <ColumnDefinition Width="76"/><ColumnDefinition Width="Auto" MinWidth="206" SharedSizeGroup="Pick"/><ColumnDefinition Width="150"/><ColumnDefinition Width="132"/><ColumnDefinition Width="56"/><ColumnDefinition Width="72"/>
                                             </Grid.ColumnDefinitions>
                                             <Image Source="{Binding Icon}" Width="22" Height="22" HorizontalAlignment="Left" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center" ToolTip="{Binding ExePath}" Margin="0,0,12,0">
@@ -184,6 +185,8 @@
                                             </Grid>
                                             <CheckBox Grid.Column="8" Style="{StaticResource Switch}" IsChecked="{Binding Force, Mode=OneWay}" IsEnabled="{Binding ForceAllowed}"
                                                       ToolTip="{Binding ForceTip}" ToolTipService.ShowOnDisabled="True" Click="Force_Click" VerticalAlignment="Center"/>
+                                            <CheckBox Grid.Column="9" Style="{StaticResource Switch}" IsChecked="{Binding AccelOn, Mode=OneWay}" Visibility="{Binding AccelVisible}" Click="Accel_Click" VerticalAlignment="Center"
+                                                      ToolTip="Off: the app renders on the CPU instead of any GPU (switched live, it just blinks; kept off every time it starts). On again restarts it."/>
                                         </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -534,6 +537,13 @@
                                             <Button Content="Pick area" Style="{StaticResource SmallButton}" Click="PixelPickArea_Click" Margin="0,0,6,0"/>
                                             <Button x:Name="PixelAreaReset" Content="Use the middle" Style="{StaticResource SmallButton}" Click="PixelAreaReset_Click"/>
                                         </StackPanel>
+                                    </Grid>
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Contrast" VerticalAlignment="Center" FontSize="13"
+                                                   ToolTip="Stretches dark and bright apart, makes colors stronger and edges sharper, so bright screens don't blend into one blob"/>
+                                        <Slider Grid.Column="1" x:Name="PixelContrast" Minimum="0" Maximum="100" SmallChange="5" LargeChange="10" ValueChanged="PixelContrast_Changed" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" x:Name="PixelContrastText" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="13" Foreground="{DynamicResource Sub}"/>
                                     </Grid>
                                 </StackPanel>
 

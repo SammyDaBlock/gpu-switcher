@@ -17,13 +17,16 @@ public static class LaunchHook
 
     static bool Ours(object? v) => v is string s && s.Contains(HelperExe, StringComparison.OrdinalIgnoreCase);
 
+    // settings.json is user-writable but we write HKLM as admin: only ever hook launchers we know, never a name from the file
+    static readonly HashSet<string> Allowed = new(StringComparer.OrdinalIgnoreCase) { "FortniteLauncher.exe" };
+
     /// <summary>Hooks every enabled rule's launcher and unhooks everything else that is ours.</summary>
     public static void Sync()
     {
         lock (Lock)
         {
             var want = File.Exists(HelperPath)
-                ? AppSettings.Current.ForceRules.Where(r => r.Enabled && !string.IsNullOrEmpty(r.Hook)).Select(r => r.Hook!).ToHashSet(StringComparer.OrdinalIgnoreCase)
+                ? AppSettings.Current.ForceRules.Where(r => r.Enabled && !string.IsNullOrEmpty(r.Hook)).Select(r => r.Hook!).Where(Allowed.Contains).ToHashSet(StringComparer.OrdinalIgnoreCase)
                 : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             try
             {

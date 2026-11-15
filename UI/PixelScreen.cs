@@ -134,6 +134,7 @@ public static class PixelScreen
     // ------------------------------------------------------------------ frame loop
 
     static byte[]? _last;
+    static string? _imageFor, _captureFor, _printerFor; // the setting each cache was made for
 
     static void Loop()
     {
@@ -146,11 +147,11 @@ public static class PixelScreen
             {
                 if (gen != _gen)
                 {
-                    // settings changed: reload the image, reopen the capture / printer connection, resend
+                    // settings changed: reload / reconnect only what its setting changed, then resend
                     gen = _gen;
-                    _imageFrames = null;
-                    _capture?.Dispose(); _capture = null;
-                    _printer?.Cancel(); _printer = null;
+                    if (_imageFor != S.ImagePath) _imageFrames = null;
+                    if (_captureFor != S.MirrorMonitor) { _capture?.Dispose(); _capture = null; }
+                    if (_printerFor != S.PrinterUrl + "|" + S.PrinterKey) { _printer?.Cancel(); _printer = null; }
                     _last = null;
                 }
                 Array.Clear(img);
@@ -369,7 +370,11 @@ public static class PixelScreen
 
     static int DrawPrinter(byte[] img)
     {
-        if (_printer == null) { _printer = new CancellationTokenSource(); var tok = _printer.Token; Task.Run(() => PrinterLoop(tok)); }
+        if (_printer == null)
+        {
+            _printerFor = S.PrinterUrl + "|" + S.PrinterKey;
+            _printer = new CancellationTokenSource(); var tok = _printer.Token; Task.Run(() => PrinterLoop(tok));
+        }
         var ps = _ps;
         bool failed = ps != null && (ps.State == "FAILED" || ps.Error != "");
         bool done = ps?.State == "FINISH";
@@ -474,11 +479,58 @@ public static class PixelScreen
             var mons = Overlays.Monitors();
             var m = mons.FirstOrDefault(x => x.Device == S.MirrorMonitor);
             if (m.Device == null) m = mons.FirstOrDefault();
+            _captureFor = S.MirrorMonitor;
             // capture on the GPU the monitors are plugged into (the 5070), whatever GPU this app is set to
             _capture = new ScreenCapture((m.Bounds.X, m.Bounds.Y, m.Bounds.W, m.Bounds.H), Gpus.DisplayGpu?.Luids.ToArray() ?? Array.Empty<long>());
         }
         // -66: nothing new on screen, keep the last frame and check again in a frame's time
-        return _capture.Grab(S.MirrorRegion, img) ? 66 : -66;
+        if (!_capture.Grab(S.MirrorRegion, img)) return -66;
+        Enhance(img, S.MirrorContrast / 100.0);
+        return 66;
+    }
+
+    /// <summary>
+    /// Makes a shrunk screen readable on 556 LEDs: bright UI averages into similar pastels, so stretch the frame's
+    /// own dark..bright range, push colors apart (saturation) and sharpen edges. k = 0 leaves the image alone.
+    /// </summary>
+    static void Enhance(byte[] img, double k)
+    {
+        if (k <= 0) return;
+        int n = N * N;
+        var luma = new double[n];
+        for (int i = 0; i < n; i++) luma[i] = 0.299 * img[i * 3] + 0.587 * img[i * 3 + 1] + 0.114 * img[i * 3 + 2];
+
+        // levels: 3rd..97th percentile of brightness -> 0..255 (ignores a few stray pixels)
+        var sorted = (double[])luma.Clone();
+        Array.Sort(sorted);
+        double lo = sorted[n * 3 / 100], hi = sorted[n * 97 / 100];
+        double range = Math.Max(hi - lo, 24); // don't blow up an almost flat image
+        double gain = 1 + k * (255 / range - 1), offset = k * lo;
+
+        double sat = 1 + 1.2 * k, sharp = 0.9 * k;
+        var src = (byte[])img.Clone();
+        for (int y = 0; y < N; y++)
+            for (int x = 0; x < N; x++)
+            {
+                int i = y * N + x;
+                for (int ch = 0; ch < 3; ch++)
+                {
+                    // unsharp mask against the 3x3 neighbourhood average
+                    double sum = 0; int cnt = 0;
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int xx = x + dx, yy = y + dy;
+                            if ((uint)xx >= N || (uint)yy >= N) continue;
+                            sum += src[(yy * N + xx) * 3 + ch]; cnt++;
+                        }
+                    double v = src[i * 3 + ch];
+                    v += sharp * (v - sum / cnt);
+                    v = luma[i] + (v - luma[i]) * sat;   // saturation around the pixel's own grey
+                    v = (v - offset) * gain;             // levels
+                    img[i * 3 + ch] = (byte)Math.Clamp(v, 0, 255);
+                }
+            }
     }
 
     // ------------------------------------------------------------------ GIF / image
@@ -488,7 +540,7 @@ public static class PixelScreen
 
     static int DrawImage(byte[] img)
     {
-        if (_imageFrames == null) { _imageFrames = LoadImage(S.ImagePath); _imageIndex = 0; }
+        if (_imageFrames == null) { _imageFor = S.ImagePath; _imageFrames = LoadImage(S.ImagePath); _imageIndex = 0; }
         var frames = _imageFrames;
         if (frames.Count == 0) { Text(img, "!", 8, 3, ParseColor(S.Color)); return 1000; }
         var (rgb, ms) = frames[_imageIndex++ % frames.Count];
