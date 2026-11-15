@@ -187,6 +187,11 @@ public static class LiveSwitch
         var pids = procs.Select(p => p.Pid).ToHashSet();
         var root = procs.FirstOrDefault(p => !pids.Contains(p.ParentPid));
         var cmd = root.CommandLine;
+        // only ever start it as admin again if it already ran as admin AND its exe sits where normal programs can't
+        // swap it (Program Files / Windows); otherwise we'd hand admin rights to whatever is at that path now
+        bool elevated = Native.IsElevated(root.Pid), mayElevate = elevated && InProtectedFolder(exePath);
+        if (elevated && !mayElevate)
+            return "Saved. It runs as admin from a folder other programs can change, so it isn't closed from here: restart it yourself and it uses the new GPU.";
 
         foreach (var pid in pids)
         {
@@ -206,9 +211,9 @@ public static class LiveSwitch
         try
         {
             try { Native.LaunchUnelevated(exePath, cmd, Path.GetDirectoryName(exePath)); }
-            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 740 /* ERROR_ELEVATION_REQUIRED */)
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 740 /* ERROR_ELEVATION_REQUIRED */ && mayElevate)
             {
-                // the app always runs as admin (so it did before we closed it too): start it from here, we're admin, no UAC prompt
+                // it always runs as admin and did before we closed it: start it from here (we're admin), no UAC prompt
                 Process.Start(new ProcessStartInfo(exePath, ArgsOf(cmd)) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exePath) })?.Dispose();
             }
             Log.Write($"relaunched {Path.GetFileName(exePath)}");
@@ -219,6 +224,14 @@ public static class LiveSwitch
             Log.Write($"relaunch {Path.GetFileName(exePath)} failed: {ex.Message}");
             return $"Closed it, but relaunching failed ({ex.Message}). Start it yourself, it'll use the new GPU.";
         }
+    }
+
+    static bool InProtectedFolder(string exePath)
+    {
+        var full = Path.GetFullPath(exePath);
+        return new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.Windows }
+            .Select(Environment.GetFolderPath)
+            .Any(dir => dir.Length > 0 && full.StartsWith(dir.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>A full command line minus the exe at the front ("C:\x.exe" -a b -> -a b).</summary>

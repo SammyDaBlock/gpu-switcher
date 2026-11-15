@@ -240,6 +240,23 @@ static class Native
     [StructLayout(LayoutKind.Sequential)]
     struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public int dwProcessId, dwThreadId; }
 
+    [DllImport("advapi32.dll", SetLastError = true)]
+    static extern bool GetTokenInformation(IntPtr token, int infoClass, out int info, int length, out int returned);
+
+    /// <summary>True if the process runs as admin (elevated token). False if not, or if we can't tell.</summary>
+    public static bool IsElevated(int pid)
+    {
+        var h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (h == IntPtr.Zero) return false;
+        try
+        {
+            if (!OpenProcessToken(h, 0x0008 /* TOKEN_QUERY */, out var tok)) return false;
+            try { return GetTokenInformation(tok, 20 /* TokenElevation */, out int elevated, 4, out _) && elevated != 0; }
+            finally { CloseHandle(tok); }
+        }
+        finally { CloseHandle(h); }
+    }
+
     /// <summary>PID of Explorer's shell (0 if the desktop isn't up yet).</summary>
     public static int GetShellProcessId()
     {
