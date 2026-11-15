@@ -12,13 +12,19 @@ public class ForceMode : IDisposable
     readonly HashSet<ForceRule> _running = new();
     public event Action<string>? Notify;
 
+    /// <summary>Fortnite has anti-cheat, so its launcher is hooked: the GPU goes off before anything of Fortnite runs
+    /// (Epic -> GpuSwitcherHook -> FortniteLauncher -> _EAC_EOS -> client). The other names only count as "launch still alive".</summary>
     public static ForceRule FortnitePreset(string disableGpuKey) => new()
     {
         Label = "Fortnite",
         GameExe = "FortniteClient-Win64-Shipping.exe",
-        Triggers = new() { "FortniteLauncher.exe", "FortniteClient-Win64-Shipping_EAC_EOS.exe", "FortniteClient-Win64-Shipping_BE.exe", "FortniteClient-Win64-Shipping.exe" },
+        Hook = "FortniteLauncher.exe",
+        Triggers = new() { LaunchHook.HelperExe, "FortniteLauncher.exe", "FortniteClient-Win64-Shipping_EAC_EOS.exe", "FortniteClient-Win64-Shipping_BE.exe" },
         DisableGpuKey = disableGpuKey,
+        MaxWaitSeconds = 120,
     };
+
+    public static bool IsFortnite(string exe) => Path.GetFileName(exe).StartsWith("FortniteClient", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Polls the process list every 100 ms (Toolhelp snapshot, under 1 ms) while any rule is on.
@@ -27,6 +33,17 @@ public class ForceMode : IDisposable
     /// </summary>
     public void Start()
     {
+        // anti-cheat games only get force mode through the launch hook (older Fortnite rules triggered on the launcher, too late)
+        var s = AppSettings.Current;
+        foreach (var r in s.ForceRules.Where(r => AntiCheat.IsRule(r) && r.Hook == null).ToList())
+        {
+            s.ForceRules.Remove(r);
+            if (IsFortnite(r.GameExe)) s.ForceRules.Add(FortnitePreset(r.DisableGpuKey));
+            Log.Write($"force mode: {r.Label} has anti-cheat, " + (IsFortnite(r.GameExe) ? "switched it to the launch hook" : "removed its rule"));
+        }
+        s.Save();
+        LaunchHook.Sync();
+
         var t = new Thread(() =>
         {
             HashSet<int> known = Native.ProcessSnapshot().Select(p => p.Pid).ToHashSet();
@@ -36,12 +53,15 @@ public class ForceMode : IDisposable
                 try
                 {
                     var rules = AppSettings.Current.ForceRules.ToList();
+                    // rule added/removed/toggled in the UI: hook or unhook its launcher
+                    var hooks = string.Join("|", rules.Where(r => r.Enabled && r.Hook != null).Select(r => r.Hook));
+                    if (hooks != _hooks) { _hooks = hooks; LaunchHook.Sync(); }
                     if (!rules.Any(r => r.Enabled)) { known.Clear(); continue; }
                     var now = Native.ProcessSnapshot();
                     bool first = known.Count == 0;
                     foreach (var (pid, name) in now)
                     {
-                        if (first || known.Contains(pid)) continue;
+                        if (first || known.Contains(pid) || AntiCheat.IsName(name)) continue;
                         if (rules.Any(r => r.Enabled && (r.Triggers.Contains(name, StringComparer.OrdinalIgnoreCase) || r.GameExe.Equals(name, StringComparison.OrdinalIgnoreCase))))
                         {
                             try
@@ -62,6 +82,7 @@ public class ForceMode : IDisposable
     }
 
     readonly CancellationTokenSource _stop = new();
+    string? _hooks;
 
     void OnProcessStarted(string name)
     {
@@ -91,7 +112,7 @@ public class ForceMode : IDisposable
         {
             var gpu = Gpus.ByKey(rule.DisableGpuKey);
             if (gpu == null) { Notify?.Invoke($"Force mode ({label}): GPU not found."); return; }
-            var why = DeviceGuard.WhyNot(gpu);
+            var why = DeviceGuard.WhyNot(gpu, rule.Hook != null);
             if (why != null) { Notify?.Invoke($"Force mode ({label}): {why}"); return; }
 
             // Too late? Pulling the GPU out from under a running game crashes it, so don't.
@@ -106,8 +127,9 @@ public class ForceMode : IDisposable
             string result = "gave up waiting";
             await DeviceGuard.RunWithGpuDisabled(gpu, rule.MaxWaitSeconds, $"force mode {label}", async ct =>
             {
+                if (rule.Hook != null) LaunchHook.Remove(rule.Hook); // GPU is off: the waiting helper starts the real launcher now
                 result = await WaitForGpuPick(rule, gpu, ct);
-            });
+            }, hookedLaunch: rule.Hook != null);
             lock (_running) _running.Remove(rule);
             Notify?.Invoke($"Force mode ({label}): {result}. {gpu.ShortName} is back on.");
         }
@@ -116,7 +138,12 @@ public class ForceMode : IDisposable
             Log.Write($"force mode {label}: {ex.Message}");
             Notify?.Invoke($"Force mode ({label}) failed: {ex.Message}");
         }
-        finally { lock (_running) _running.Remove(rule); }
+        finally
+        {
+            lock (_running) _running.Remove(rule);
+            // every way out (also "GPU busy" etc.) lets the launcher start, then the hook goes back for next time
+            if (rule.Hook != null) await LaunchHook.Rearm(rule.Hook);
+        }
     }
 
     static bool GameIsOn(ForceRule rule, GpuAdapter gpu)
@@ -163,5 +190,9 @@ public class ForceMode : IDisposable
         }
     }
 
-    public void Dispose() => _stop.Cancel();
+    public void Dispose()
+    {
+        _stop.Cancel();
+        LaunchHook.RemoveAll(); // without GPU Switcher the launcher starts normally
+    }
 }

@@ -63,13 +63,15 @@ public static class Compat
     /// </summary>
     public static void DetectRunning(IEnumerable<RunningApp> apps)
     {
-        var unknown = apps.Where(a => !a.IsSystem && KnownChromium(a.ExePath) == null).Select(a => a.ExePath)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // games are never Chromium, and asking WMI about anti-cheat games would read their command line
+        var unknown = apps.Where(a => !a.IsSystem && !IsGame(a.ExePath) && !AntiCheat.Is(a.ExePath) && KnownChromium(a.ExePath) == null)
+            .Select(a => a.ExePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (unknown.Count == 0) return;
         var withGpuProcess = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            using var s = new System.Management.ManagementObjectSearcher("SELECT ExecutablePath, CommandLine FROM Win32_Process");
+            var names = string.Join(" OR ", unknown.Select(p => $"Name='{Path.GetFileName(p).Replace("'", "''")}'").Distinct());
+            using var s = new System.Management.ManagementObjectSearcher($"SELECT ExecutablePath, CommandLine FROM Win32_Process WHERE {names}");
             foreach (System.Management.ManagementObject mo in s.Get())
             {
                 var path = mo["ExecutablePath"] as string;

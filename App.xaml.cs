@@ -84,6 +84,8 @@ public partial class App : Application
         CreateTray();
         UI.Overlays.Notify += msg => Balloon(msg);
         UI.Overlays.Start();
+        UI.PixelScreen.Notify += msg => Balloon(msg);
+        UI.PixelScreen.Start();
         ListenForShow();
 
         bool tray = args.Contains("--tray");
@@ -193,6 +195,7 @@ public partial class App : Application
             Balloon("Waiting for the GPU to come back on before exiting…");
             while (DeviceGuard.IsBusy) await Task.Delay(200);
         }
+        UI.PixelScreen.Shutdown();
         UI.Overlays.Shutdown();
         _monitor?.Dispose();
         _force?.Dispose();
@@ -448,10 +451,31 @@ public partial class App : Application
                 return true;
             }
 
+            case "--unhook":
+                LaunchHook.RemoveAll();
+                return true;
+
             case "--recover":
                 Gpus.Refresh();
                 DeviceGuard.EnableAllGpus();
                 return true;
+
+            // --selftest-anticheat <out>: anti-cheat detection + handle-free process paths
+            case "--selftest-anticheat":
+            {
+                string result;
+                try
+                {
+                    AntiCheat.SelfTest();
+                    var own = Native.GetProcessPath(Environment.ProcessId);
+                    if (!string.Equals(own, Environment.ProcessPath, StringComparison.OrdinalIgnoreCase))
+                        throw new Exception($"handle-free path wrong: {own} vs {Environment.ProcessPath}");
+                    result = $"OK. own path {own}. running anti-cheat game: {AntiCheat.Running() ?? "none"}";
+                }
+                catch (Exception ex) { result = "FAIL " + ex.Message; }
+                File.WriteAllText(args[1], result);
+                return true;
+            }
 
             case "--list":
             {

@@ -31,6 +31,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Files]
 Source: "..\publish\GpuSwitcher.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\publish\GpuSwitcherHook.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\GPU Switcher"; Filename: "{app}\GpuSwitcher.exe"
@@ -46,6 +47,9 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM GpuSwitcher.exe"; Flags: run
 Filename: "{app}\GpuSwitcher.exe"; Parameters: "--restore-startup"; Flags: runhidden waituntilterminated; RunOnceId: "RestoreStartup"
 Filename: "{app}\GpuSwitcher.exe"; Parameters: "--autostart off"; Flags: runhidden waituntilterminated; RunOnceId: "Autostart"
 Filename: "{app}\GpuSwitcher.exe"; Parameters: "--recover"; Flags: runhidden waituntilterminated; RunOnceId: "Recover"
+Filename: "{app}\GpuSwitcher.exe"; Parameters: "--unhook"; Flags: runhidden waituntilterminated; RunOnceId: "Unhook"
+; the pump screen feature stops Cooler Master's service while it's on: give it back (no-op if it's already running)
+Filename: "{sys}\sc.exe"; Parameters: "start MasterCTRLService"; Flags: runhidden waituntilterminated; RunOnceId: "PumpScreen"
 
 [Code]
 // An update replaces the exe, so the running copy has to go first. If it had a GPU switched off,

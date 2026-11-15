@@ -4,6 +4,8 @@ Set-Location $PSScriptRoot
 
 dotnet publish -c Release -o publish -p:SelfContained=true -p:EnableCompressionInSingleFile=true -nologo
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
+& "$PSScriptRoot\hook\build.cmd"
+if ($LASTEXITCODE -ne 0) { throw "hook build failed" }
 
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "Inno Setup not found. Install it: winget install JRSoftware.InnoSetup" }

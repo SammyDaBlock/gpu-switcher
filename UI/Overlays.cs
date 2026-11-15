@@ -86,22 +86,29 @@ public static class Overlays
         var fg = GetForegroundWindow();
         GetWindowThreadProcessId(fg, out int pid);
         bool ours = pid == OwnPid;
+        // never draw over anti-cheat games (Fortnite, EAC, BattlEye): both overlays step aside while one is in front
+        bool antiCheat = fg != IntPtr.Zero && !ours && PathOf(pid) is { Length: > 0 } path && AntiCheat.Is(path);
         if (fg != IntPtr.Zero && !ours)
         {
             TargetHwnd = fg;
             TargetPid = pid;
-            TargetExe = ExeOf(pid);
+            TargetExe = Path.GetFileName(PathOf(pid));
+            TargetIsAntiCheat = antiCheat;
         }
+        if (antiCheat) _perf?.HideOverlay();
+        else if (S.PerfEnabled) _perf?.ShowOverlay();
         _perf?.Tick();
         // covers only show while their game is really in front, not while our own window is
-        _covers?.Tick(ours ? IntPtr.Zero : fg, ours ? "" : TargetExe);
+        _covers?.Tick(ours || antiCheat ? IntPtr.Zero : fg, ours || antiCheat ? "" : TargetExe);
     }
 
-    static string ExeOf(int pid)
+    public static bool TargetIsAntiCheat { get; private set; }
+
+    static string PathOf(int pid)
     {
         if (ExeCache.TryGetValue(pid, out var exe)) return exe;
         if (ExeCache.Count > 200) ExeCache.Clear();
-        return ExeCache[pid] = Path.GetFileName(Native.GetProcessPath(pid) ?? "");
+        return ExeCache[pid] = Native.GetProcessPath(pid) ?? "";
     }
 
     // ------------------------------------------------------------------ hotkeys
@@ -176,6 +183,7 @@ public static class Overlays
             Notify?.Invoke($"Click into the game first, then press {EditKeys} to place money covers.");
             return;
         }
+        if (TargetIsAntiCheat) { Notify?.Invoke($"{Path.GetFileNameWithoutExtension(TargetExe)} has anti-cheat, so no overlays are drawn over it."); return; }
         _covers ??= new CoverOverlay();
         _covers.BeginEdit(TargetHwnd, TargetExe);
         Apply();

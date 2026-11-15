@@ -38,19 +38,22 @@ public static class DeviceGuard
         if (pnp != null) Enable(pnp);
     }
 
-    public static string? WhyNot(GpuAdapter gpu)
+    public static string? WhyNot(GpuAdapter gpu, bool hookedLaunch = false)
     {
         if (gpu.IsDisplayGpu) return $"{gpu.ShortName} has your monitors on it. Turning it off would black out every screen, so this app never does that.";
         if (gpu.PnpId == null) return $"Couldn't find the device ID for {gpu.ShortName}.";
         if (Gpus.All.Count(g => !g.IsDisabled) < 2) return "Only one GPU is active.";
         if (IsBusy) return "Another GPU operation is already running.";
+        // a GPU going off or on under an anti-cheat game freezes it or breaks EAC, so wait until it's closed
+        // hooked launch: the launcher is held back, so its parent (FortniteBootstrapper) is the only thing of the game running
+        if (!hookedLaunch && AntiCheat.Running() is { } game) return $"{Path.GetFileNameWithoutExtension(game)} is running and has anti-cheat. Close it first, GPUs aren't switched off or on while it runs.";
         return null;
     }
 
     /// <summary>Disables the GPU, runs <paramref name="whileDisabled"/>, then ALWAYS re-enables it.</summary>
-    public static async Task RunWithGpuDisabled(GpuAdapter gpu, int maxSeconds, string reason, Func<CancellationToken, Task> whileDisabled)
+    public static async Task RunWithGpuDisabled(GpuAdapter gpu, int maxSeconds, string reason, Func<CancellationToken, Task> whileDisabled, bool hookedLaunch = false)
     {
-        var why = WhyNot(gpu);
+        var why = WhyNot(gpu, hookedLaunch);
         if (why != null) throw new InvalidOperationException(why);
         if (!await Busy.WaitAsync(0)) throw new InvalidOperationException("Another GPU operation is already running.");
         var pnp = gpu.PnpId!;

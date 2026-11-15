@@ -242,8 +242,6 @@
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="210"/></Grid.RowDefinitions>
                     <DockPanel Margin="0,0,0,12">
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
-                            <Button Content="Add Fortnite" Click="AddFortnite_Click" Margin="0,0,8,0"
-                                    ToolTip="Fortnite with its launcher and anti-cheat exes already filled in"/>
                             <Button Style="{StaticResource AccentButton}" Click="AddGame_Click"
                                     ToolTip="Pick any game's exe. Unreal Engine games: pick the ...-Win64-Shipping.exe in the game's Binaries\Win64 folder.">
                                 <StackPanel Orientation="Horizontal">
@@ -253,7 +251,7 @@
                             </Button>
                         </StackPanel>
                         <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,24,0" MaxWidth="820" HorizontalAlignment="Left"
-                                   Text="For games that ignore every GPU setting. When the game (or its launcher) starts, the other GPU is turned off until the game has picked its GPU, then turned back on. Nothing touches the game itself. Turn it on for any game with the Force switch in the Running tab."/>
+                                   Text="For games that ignore every GPU setting. When the game (or its launcher) starts, the other GPU is turned off until the game has picked its GPU, then turned back on. Nothing touches the game itself. Turn it on for any game with the Force switch in the Running tab. Fortnite works too, even from Epic's Play button: GPU Switcher steps in before its anti-cheat starts. Other anti-cheat games (Easy Anti-Cheat, BattlEye) only get the normal Windows GPU setting."/>
                     </DockPanel>
                     <Border Grid.Row="1" Style="{StaticResource Layer}" Padding="6">
                         <Grid>
@@ -472,6 +470,87 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- ================= PUMP SCREEN ================= -->
+            <TabItem Header="Pump screen">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid MaxWidth="980" HorizontalAlignment="Left" Margin="0,0,10,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition/></Grid.ColumnDefinitions>
+
+                        <!-- left: live preview, on/off, brightness, rotation -->
+                        <Border Style="{StaticResource Card}" Margin="0,0,10,10" VerticalAlignment="Top">
+                            <StackPanel>
+                                <TextBlock Text="Atmos II screen" Style="{StaticResource H2}"/>
+                                <Border Width="216" Height="216" CornerRadius="108" Background="Black" HorizontalAlignment="Center" Margin="0,6,0,12">
+                                    <Image x:Name="PixelPreview" Width="192" Height="192" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                                </Border>
+                                <TextBlock x:Name="PixelStatus" Style="{StaticResource SubText}" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,14"/>
+                                <CheckBox x:Name="PixelOn" Style="{StaticResource Switch}" Content="Drive the pump screen" Click="PixelOn_Click" Margin="0,0,0,6"/>
+                                <TextBlock Style="{StaticResource SubText}" FontSize="12" LineHeight="17" TextWrapping="Wrap" Margin="0,0,0,16"
+                                           Text="While this is on, Cooler Master's MasterCTRL service is stopped so it can't fight over the screen. Turning it off (or exiting) starts it again."/>
+                                <DockPanel Margin="0,0,0,4">
+                                    <TextBlock x:Name="PixelBrightnessText" DockPanel.Dock="Right" FontSize="13" Foreground="{DynamicResource Sub}"/>
+                                    <TextBlock Text="Brightness" FontSize="13"/>
+                                </DockPanel>
+                                <Slider x:Name="PixelBrightness" Minimum="5" Maximum="100" SmallChange="5" LargeChange="10" ValueChanged="PixelBrightness_Changed" Margin="0,0,0,14"/>
+                                <TextBlock Text="Rotation" FontSize="13" Margin="0,0,0,6"/>
+                                <ContentPresenter x:Name="PixelRotationPicker" ContentTemplate="{StaticResource ChoicePicker}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- right: what to show -->
+                        <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,0,10" VerticalAlignment="Top">
+                            <StackPanel>
+                                <TextBlock Text="Show" Style="{StaticResource H2}"/>
+                                <ContentPresenter x:Name="PixelModePicker" ContentTemplate="{StaticResource ChoicePicker}" Margin="0,2,0,16"/>
+                                <TextBlock x:Name="PixelColorLabel" Text="Color" Style="{StaticResource Caption}" Margin="0,0,0,8"/>
+                                <WrapPanel x:Name="PixelColors" Margin="0,0,0,16"/>
+
+                                <StackPanel x:Name="PixelClockPanel">
+                                    <CheckBox x:Name="PixelClock24" Style="{StaticResource Switch}" Content="24-hour time" Click="PixelClock_Click" Margin="0,0,0,10"/>
+                                    <CheckBox x:Name="PixelClockSeconds" Style="{StaticResource Switch}" Content="Seconds dot running around the edge" Click="PixelClock_Click"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="PixelPrinterPanel">
+                                    <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,12"
+                                               Text="A Bambu printer's progress from the self-hosted print app's TV feed (home network): a ring around the edge, % in the middle, time left below. Flashes green when it's done and red on an error. Shows the clock while nothing is printing."/>
+                                    <TextBlock Text="Print app TV link (http://.../tv?key=...)" FontSize="13" Margin="0,0,0,6"/>
+                                    <TextBox x:Name="PixelPrinterKey" LostFocus="PixelPrinterKey_LostFocus" Margin="0,0,0,8"/>
+                                    <TextBlock x:Name="PixelPrinterStatus" Style="{StaticResource SubText}" FontSize="12" TextWrapping="Wrap"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="PixelMirrorPanel">
+                                    <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,12"
+                                               Text="Shows a square of a monitor, up to 15 times a second. The monitor's own GPU shrinks it, so it costs almost nothing while you game. Exclusive fullscreen games can come out black, use borderless."/>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Display" VerticalAlignment="Center" FontSize="13"/>
+                                        <ContentPresenter Grid.Column="1" x:Name="PixelMonitorPicker" ContentTemplate="{StaticResource ChoicePicker}"/>
+                                    </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Area" VerticalAlignment="Center" FontSize="13"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <TextBlock x:Name="PixelAreaText" VerticalAlignment="Center" FontSize="13" Margin="0,0,12,0"/>
+                                            <Button Content="Pick area" Style="{StaticResource SmallButton}" Click="PixelPickArea_Click" Margin="0,0,6,0"/>
+                                            <Button x:Name="PixelAreaReset" Content="Use the middle" Style="{StaticResource SmallButton}" Click="PixelAreaReset_Click"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+
+                                <StackPanel x:Name="PixelImagePanel">
+                                    <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,12"
+                                               Text="A GIF plays at its own speed (15 frames a second at most). Pictures and GIFs get cropped to the middle square."/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Choose file" Click="PixelChooseImage_Click" Margin="0,0,12,0"/>
+                                        <TextBlock x:Name="PixelImageText" VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis" MaxWidth="360"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
             <!-- ================= SETTINGS ================= -->
             <TabItem Header="Settings">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -514,6 +593,8 @@
                                 <TextBlock Text="Safety" Style="{StaticResource H2}"/>
                                 <TextBlock Style="{StaticResource SubText}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,0,0,14"
                                            Text="A GPU is only ever turned off for a few seconds and never the one your monitors are on. It always comes back: right after the action, from a separate watchdog if this app crashes, at the next start of this app, and at the latest after a reboot (the switch-off isn't saved by Windows)."/>
+                                <CheckBox x:Name="AntiCheatSafety" Style="{StaticResource Switch}" Content="Anti-cheat safety: never switch GPUs, restart or draw overlays over Easy Anti-Cheat / BattlEye games" Click="AntiCheatSafety_Click" Margin="0,0,0,14"
+                                          ToolTip="Off: they're treated like any other game. A GPU going off or on while their anti-cheat loads can give EAC error 30005 or freeze the game. Fortnite's force mode works either way."/>
                                 <Button HorizontalAlignment="Left" Click="EnableAll_Click">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE72C;" Style="{StaticResource Glyph}" FontSize="12" Margin="0,0,8,0"/>

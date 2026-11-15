@@ -14,6 +14,8 @@ public class ForceRule
     /// <summary>Give up waiting and re-enable after this long, no matter what.</summary>
     public int MaxWaitSeconds { get; set; } = 90;
     public string Label { get; set; } = "";
+    /// <summary>Anti-cheat games: launcher exe that gets the launch hook (see LaunchHook), so the GPU is off before it starts.</summary>
+    public string? Hook { get; set; }
 }
 
 /// <summary>One money cover, as fractions of the game window's client area (so it survives resolution changes).</summary>
@@ -54,6 +56,34 @@ public class OverlaySettings
     public bool CoverLabel { get; set; } = true;
 }
 
+/// <summary>The Atmos II pump's 32x32 screen (see PixelDisplay, UI/PixelScreen).</summary>
+public class PixelSettings
+{
+    /// <summary>We drive the screen; Cooler Master's MasterCTRLService is stopped meanwhile.</summary>
+    public bool Enabled { get; set; }
+    /// <summary>Set while we hold the service stopped, so a crash gets it restarted at the next launch.</summary>
+    public bool VendorStopped { get; set; }
+    /// <summary>Clock, Printer, Mirror, Image.</summary>
+    public string Mode { get; set; } = "Clock";
+    public int Brightness { get; set; } = 100;
+    public int Rotation { get; set; } = 90;
+    public string Color { get; set; } = "#FFFFFF";
+
+    public bool Clock24h { get; set; } = true;
+    public bool ClockSeconds { get; set; } = true;
+
+    /// <summary>The print app's TV websocket (ws://host:port/tvws, home network) and its key, both from its TV link.</summary>
+    public string PrinterUrl { get; set; } = "";
+    public string PrinterKey { get; set; } = "";
+
+    /// <summary>Device name like \\.\DISPLAY1. Null = main display.</summary>
+    public string? MirrorMonitor { get; set; }
+    /// <summary>Square part of that monitor, as fractions. Null = the middle square of the whole screen.</summary>
+    public CoverRect? MirrorRegion { get; set; }
+
+    public string? ImagePath { get; set; }
+}
+
 /// <summary>What the performance overlay can show. Keys are saved in settings.</summary>
 public static class PerfOverlayItems
 {
@@ -87,6 +117,10 @@ public class AppSettings
     public List<ForceRule> ForceRules { get; set; } = new();
     /// <summary>When a GPU comes back on, put apps that were bumped off it and belong on it back there.</summary>
     public bool ReturnAppsWhenGpuBack { get; set; } = true;
+    /// <summary>Off: anti-cheat games are treated like any other game (force mode, GPU off/on while they run, overlays). See AntiCheat.</summary>
+    public bool AntiCheatSafety { get; set; } = true;
+    /// <summary>Extra anti-cheat games (exe names) on top of the built-in list and folder detection. See AntiCheat.</summary>
+    public HashSet<string> AntiCheatGames { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     // ---- compat results measured on this PC: exe name -> kind ----
     public Dictionary<string, string> CompatOverrides { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -102,6 +136,9 @@ public class AppSettings
 
     // ---- overlays ----
     public OverlaySettings Overlay { get; set; } = new();
+
+    // ---- pump screen ----
+    public PixelSettings Pixel { get; set; } = new();
 
     static string FilePath => Path.Combine(Log.Dir, "settings.json");
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
@@ -120,6 +157,7 @@ public class AppSettings
                 s.AutoAssigned = new(s.AutoAssigned, StringComparer.OrdinalIgnoreCase);
                 s.ManualOverride = new(s.ManualOverride, StringComparer.OrdinalIgnoreCase);
                 s.CompatOverrides = new(s.CompatOverrides, StringComparer.OrdinalIgnoreCase);
+                s.AntiCheatGames = new(s.AntiCheatGames, StringComparer.OrdinalIgnoreCase);
                 s.Overlay.PerfItems = new(s.Overlay.PerfItems, StringComparer.OrdinalIgnoreCase);
                 s.Overlay.Covers = new(s.Overlay.Covers, StringComparer.OrdinalIgnoreCase);
                 return s;

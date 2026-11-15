@@ -136,17 +136,53 @@ static class Native
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     static extern bool QueryFullProcessImageNameW(IntPtr h, uint flags, StringBuilder name, ref int size);
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct SYSTEM_PROCESS_ID_INFORMATION { public IntPtr ProcessId; public ushort Length, MaximumLength; public IntPtr Buffer; }
+    [DllImport("ntdll.dll")]
+    static extern int NtQuerySystemInformation(int infoClass, ref SYSTEM_PROCESS_ID_INFORMATION info, int length, out int returned);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    static extern uint QueryDosDeviceW(string device, StringBuilder target, int max);
+
+    /// <summary>
+    /// Exe path of a process WITHOUT opening it (SystemProcessIdInformation reads the kernel's process list), so
+    /// anti-cheat-protected games never see a handle from us.
+    /// </summary>
     public static string? GetProcessPath(int pid)
     {
-        var h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
-        if (h == IntPtr.Zero) return null;
+        const int SystemProcessIdInformation = 88, Bytes = 2048;
+        var buf = Marshal.AllocHGlobal(Bytes);
         try
         {
-            var sb = new StringBuilder(1024);
-            int size = sb.Capacity;
-            return QueryFullProcessImageNameW(h, 0, sb, ref size) ? sb.ToString() : null;
+            var info = new SYSTEM_PROCESS_ID_INFORMATION { ProcessId = pid, MaximumLength = Bytes, Buffer = buf };
+            if (NtQuerySystemInformation(SystemProcessIdInformation, ref info, Marshal.SizeOf<SYSTEM_PROCESS_ID_INFORMATION>(), out _) != 0 || info.Length == 0) return null;
+            return DosPath(Marshal.PtrToStringUni(buf, info.Length / 2));
         }
-        finally { CloseHandle(h); }
+        finally { Marshal.FreeHGlobal(buf); }
+    }
+
+    static Dictionary<string, string>? _drives;
+
+    /// <summary>\Device\HarddiskVolume3\x.exe -> C:\x.exe</summary>
+    static string? DosPath(string nt)
+    {
+        if (nt.StartsWith(@"\Device\Mup\", StringComparison.OrdinalIgnoreCase)) return @"\\" + nt[12..];
+        for (int pass = 0; pass < 2; pass++)
+        {
+            if (_drives == null || pass == 1) // second pass: a drive may have been plugged in since
+            {
+                var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var sb = new StringBuilder(512);
+                foreach (var d in Environment.GetLogicalDrives())
+                {
+                    var letter = d.TrimEnd('\\');
+                    if (QueryDosDeviceW(letter, sb, sb.Capacity) != 0) map[sb.ToString()] = letter;
+                }
+                _drives = map;
+            }
+            foreach (var (dev, letter) in _drives)
+                if (nt.StartsWith(dev + @"\", StringComparison.OrdinalIgnoreCase)) return letter + nt[dev.Length..];
+        }
+        return null;
     }
 
     // ---------- fast process list (Toolhelp: names + pids only, well under 1 ms) ----------

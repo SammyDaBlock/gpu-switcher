@@ -59,7 +59,9 @@ public partial class MainWindow : Window
             if (Tabs.SelectedIndex == 2) RefreshRules();
             if (Tabs.SelectedIndex == 3) RefreshStartup();
             if (Tabs.SelectedIndex == 4) RefreshOverlays();
-            if (Tabs.SelectedIndex == 5) RefreshSettings();
+            if (Tabs.SelectedIndex == PixelTab) RefreshPixel();
+            if (Tabs.SelectedIndex == 6) RefreshSettings();
+            UpdatePixelPreview();
             // new tab content slides in
             if (Tabs.Template?.FindName("PART_SelectedContentHost", Tabs) is UIElement host) Anim.FadeUp(host, 8, 200);
         };
@@ -81,8 +83,10 @@ public partial class MainWindow : Window
             Hide();
             ((App)Application.Current).HiddenToTray();
         };
+        InitPixel();
         IsVisibleChanged += (_, _) =>
         {
+            UpdatePixelPreview();
             if (!IsVisible) return;
             Theme.Refresh(); // may have switched while we were in the tray
             if (_themeDirty) RecolorAll();
@@ -111,7 +115,8 @@ public partial class MainWindow : Window
         if (Tabs.SelectedIndex == 1) RefreshSaved();
         if (Tabs.SelectedIndex == 3) RefreshStartup();
         if (Tabs.SelectedIndex == 4) RefreshOverlays();
-        if (Tabs.SelectedIndex == 5) RefreshSettings();
+        if (Tabs.SelectedIndex == PixelTab) RefreshPixel();
+        if (Tabs.SelectedIndex == 6) RefreshSettings();
     }
 
     // ------------------------------------------------------------------ data
@@ -306,6 +311,11 @@ public partial class MainWindow : Window
                 ChoiceVm.Select(p.Choices, c.Key);
                 break;
 
+            case PickerOwner { Which: var w } p when w.StartsWith("px-"):
+                PixelPick(w, c.Key);
+                ChoiceVm.Select(p.Choices, c.Key);
+                break;
+
             case PickerOwner p:
                 if (p.Which == "apps") AppSettings.Current.AutoAppsGpuKey = c.Key;
                 else AppSettings.Current.AutoGamesGpuKey = c.Key;
@@ -442,6 +452,7 @@ public partial class MainWindow : Window
                     break;
 
                 case RowAction.Restart:
+                    if (AntiCheat.Is(row.ExePath)) { Status(await LiveSwitch.RestartOnGpu(row.ExePath, pref.Key, () => Task.FromResult(false)), 12); break; }
                     var gameNote = row.Kind == LiveKind.Game ? "\n\nGames lose unsaved progress. Launcher games might need to be started from their launcher again." : "";
                     if (!Dialog.Confirm($"Restart {row.Name}?", $"It'll be closed and opened again on {pref.ShortName}.{gameNote}")) return;
                     row.Busy = true;
@@ -496,11 +507,11 @@ public partial class MainWindow : Window
         }
         else
         {
+            if (AntiCheat.Is(row.ExePath) && !ForceMode.IsFortnite(row.ExeName)) { Dialog.Info("No force mode for this game", AntiCheat.Explain(row.ExeName)); UpdateRowState(row); return; }
             var target = Gpus.ByKey(row.PrefKey) ?? Gpus.DisplayGpu;
             var hide = Gpus.All.FirstOrDefault(g => g.Key != target?.Key && !g.IsDisplayGpu);
             if (hide == null || target == null) { UpdateRowState(row); return; }
-            var rule = row.ExeName.StartsWith("FortniteClient", StringComparison.OrdinalIgnoreCase)
-                ? ForceMode.FortnitePreset(hide.Key)
+            var rule = ForceMode.IsFortnite(row.ExeName) ? ForceMode.FortnitePreset(hide.Key)
                 : new ForceRule { GameExe = row.ExeName, Triggers = new() { row.ExeName }, DisableGpuKey = hide.Key, Label = row.Name };
             s.ForceRules.Add(rule);
             if (row.PrefKey == null) { Preferences.SetGpu(row.ExePath, target.Key); AutoAssign.MarkManual(row.ExePath); }
@@ -728,6 +739,7 @@ public partial class MainWindow : Window
         AutoEnabled.IsChecked = s.AutoAssignEnabled;
         AutoLive.IsChecked = s.AutoLiveMoveChromium;
         ReturnApps.IsChecked = s.ReturnAppsWhenGpuBack;
+        AntiCheatSafety.IsChecked = s.AntiCheatSafety;
         Autostart.IsChecked = Core.Autostart.IsEnabled();
         _autoApps.Choices = ChoiceVm.Build(_autoApps, false);
         _autoGames.Choices = ChoiceVm.Build(_autoGames, false);
@@ -883,6 +895,18 @@ public partial class MainWindow : Window
         AppSettings.Current.Save();
     }
 
+    void AntiCheatSafety_Click(object sender, RoutedEventArgs e)
+    {
+        bool on = AntiCheatSafety.IsChecked == true;
+        if (!on && !Dialog.Confirm("Turn off anti-cheat safety?", "Anti-cheat games get treated like any other game: force mode, GPUs going off or on while they run, restarts and overlays. That can give EAC error 30005 or freeze the game."))
+        {
+            AntiCheatSafety.IsChecked = true;
+            return;
+        }
+        AppSettings.Current.AntiCheatSafety = on;
+        AppSettings.Current.Save();
+    }
+
     void ReturnApps_Click(object sender, RoutedEventArgs e)
     {
         AppSettings.Current.ReturnAppsWhenGpuBack = ReturnApps.IsChecked == true;
@@ -944,18 +968,6 @@ public partial class MainWindow : Window
         Status(n == 0 ? "All GPUs are already on." : $"Re-enabled {n} GPU(s).");
     }
 
-    void AddFortnite_Click(object sender, RoutedEventArgs e)
-    {
-        var s = AppSettings.Current;
-        if (s.ForceRules.Any(r => r.GameExe.StartsWith("FortniteClient", StringComparison.OrdinalIgnoreCase))) { Status("Fortnite is already in the list."); return; }
-        var hide = Gpus.All.FirstOrDefault(g => !g.IsDisplayGpu);
-        if (hide == null) { Dialog.Info("No GPU to hide", "Force mode needs a second GPU without monitors."); return; }
-        s.ForceRules.Add(ForceMode.FortnitePreset(hide.Key));
-        s.Save();
-        RefreshRules();
-        Status($"Fortnite added: {hide.ShortName} goes off for a few seconds whenever Fortnite starts.");
-    }
-
     /// <summary>Force mode for a game that isn't running (the Running tab's Force switch needs it running).</summary>
     void AddGame_Click(object sender, RoutedEventArgs e)
     {
@@ -968,14 +980,14 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog(this) != true) return;
         var exe = dlg.FileName;
         var name = Path.GetFileName(exe);
+        if (AntiCheat.Is(exe) && !ForceMode.IsFortnite(name)) { Dialog.Info("No force mode for this game", AntiCheat.Explain(name)); return; }
         var s = AppSettings.Current;
         if (s.ForceRules.Any(r => r.GameExe.Equals(name, StringComparison.OrdinalIgnoreCase))) { Status($"{name} is already in the list."); return; }
         // same choice as the Force switch: the game's GPU (or the monitors' GPU), hide one without monitors
         var target = Gpus.ByKey(Preferences.GetGpuKey(exe)) ?? Gpus.DisplayGpu;
         var hide = Gpus.All.FirstOrDefault(g => g.Key != target?.Key && !g.IsDisplayGpu);
         if (hide == null || target == null) { Dialog.Info("No GPU to hide", "Force mode needs a second GPU without monitors."); return; }
-        var rule = name.StartsWith("FortniteClient", StringComparison.OrdinalIgnoreCase)
-            ? ForceMode.FortnitePreset(hide.Key)
+        var rule = ForceMode.IsFortnite(name) ? ForceMode.FortnitePreset(hide.Key)
             : new ForceRule { GameExe = name, Triggers = new() { name }, DisableGpuKey = hide.Key, Label = Apps.FriendlyName(exe) };
         s.ForceRules.Add(rule);
         if (Preferences.GetGpuKey(exe) == null) { Preferences.SetGpu(exe, target.Key); AutoAssign.MarkManual(exe); }

@@ -180,6 +180,7 @@ public static class LiveSwitch
     public static async Task<string> RestartOnGpu(string exePath, string? targetKey, Func<Task<bool>> confirmForceClose)
     {
         Preferences.SetGpu(exePath, targetKey);
+        if (AntiCheat.Is(exePath)) return "Saved. It has anti-cheat, so it isn't closed from here: the new GPU applies next time you start it.";
         var procs = await Task.Run(() => Apps.ProcessesOf(exePath));
         if (procs.Count == 0) return "It isn't running. The new setting applies next time it starts.";
         var pids = procs.Select(p => p.Pid).ToHashSet();

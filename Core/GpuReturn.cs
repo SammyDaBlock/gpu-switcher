@@ -52,31 +52,39 @@ public static class GpuReturn
         await Task.Delay(4000); // let the re-enabled card settle and the counters see its new LUID
         if (DeviceGuard.IsBusy || Gpus.ByKey(gpu.Key)?.IsDisabled != false) return;
         var gameRunning = AppSettings.Current.ForceRules.SelectMany(r => r.Triggers.Append(r.GameExe)).ToList();
-        var results = new List<string>();
+        var tasks = new List<Task<string?>>();
         foreach (var a in Apps.Build(LiveSwitch.Monitor!.Sample()))
         {
             if (!bumped.Contains(a.ExePath) || a.IsSystem) continue;
+            if (string.Equals(a.ExePath, Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) continue; // never restart ourselves
             if (!string.Equals(Preferences.GetGpuKey(a.ExePath), gpu.Key, StringComparison.OrdinalIgnoreCase)) continue;
             if (a.PrimaryGpuKey == gpu.Key) continue;
             var kind = Compat.For(a.ExePath).Kind;
-            try
+            if (kind != LiveKind.Chromium)
             {
-                if (kind == LiveKind.Chromium)
-                {
-                    Log.Write($"returning {a.ExeName}: " + await LiveSwitch.MoveChromium(a.ExePath, gpu.Key));
-                    results.Add(a.DisplayName);
-                    continue;
-                }
                 // games lose progress, launchers may be holding a game that's still starting
                 if (kind == LiveKind.Game || a.ExeName.Contains("launcher", StringComparison.OrdinalIgnoreCase)
                     || gameRunning.Contains(a.ExeName, StringComparer.OrdinalIgnoreCase)) continue;
                 var why = LiveSwitch.WhyNotRestart(a);
                 if (why != null) { Log.Write($"not returning {a.ExeName}: {why}"); continue; }
-                Log.Write($"returning {a.ExeName}: " + await LiveSwitch.RestartOnGpu(a.ExePath, gpu.Key, () => Task.FromResult(true)));
-                results.Add($"{a.DisplayName} (restarted)");
             }
-            catch (Exception ex) { Log.Write($"returning {a.ExeName} failed: {ex.Message}"); }
+            // all at once: one by one took over a minute (restarts are up to ~9 s each)
+            tasks.Add(Task.Run(async () =>
+            {
+                try
+                {
+                    if (kind == LiveKind.Chromium)
+                    {
+                        Log.Write($"returning {a.ExeName}: " + await LiveSwitch.MoveChromium(a.ExePath, gpu.Key));
+                        return a.DisplayName;
+                    }
+                    Log.Write($"returning {a.ExeName}: " + await LiveSwitch.RestartOnGpu(a.ExePath, gpu.Key, () => Task.FromResult(true)));
+                    return $"{a.DisplayName} (restarted)";
+                }
+                catch (Exception ex) { Log.Write($"returning {a.ExeName} failed: {ex.Message}"); return null; }
+            }));
         }
+        var results = (await Task.WhenAll(tasks)).OfType<string>().ToList();
         if (results.Count > 0) Notify?.Invoke($"{gpu.ShortName} is back on. Moved back to it: {string.Join(", ", results)}.");
     }
 }

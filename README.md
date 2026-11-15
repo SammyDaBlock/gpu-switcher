@@ -35,6 +35,17 @@ Click-through windows on top of your games. Nothing is injected into the game.
 
 Limits: overlays show over **borderless / windowed** games, not exclusive fullscreen. FPS comes from DirectX's own frame events (like PresentMon), so it works for DirectX 9-12 games but not OpenGL / Vulkan ones. Temperature, clock, power and fan need an NVIDIA card. Every Roblox experience is the same exe, so they share one set of covers.
 
+### Pump screen (Cooler Master Atmos II Pixel)
+
+Drives the 32x32 round screen on a Cooler Master MasterLiquid Atmos II Pixel LED 360 directly over USB, without Cooler Master's software (the protocol is written up in [docs/pixel-protocol.md](docs/pixel-protocol.md)). Modes:
+
+- **Clock**: 24h time on one line, spinning hearts, sparkles and a seconds dot running around the edge, any color.
+- **3D printer**: progress ring, % and time left for a Bambu printer, read from a self-hosted print app's TV feed on the home network. Flashes when a print is done or fails.
+- **Screen mirror**: a square of any monitor at up to 15 fps (Windows.Graphics.Capture, downscaled on the monitor's GPU, so it's cheap while gaming). Drag your own square or use the middle of the screen.
+- **GIF / image**: cropped to the middle square, GIFs play at their own speed.
+
+Brightness and rotation are in the tab. While it's on, Cooler Master's MasterCTRL service is stopped so the two don't fight over the screen; turning it off, exiting or uninstalling starts it again. Only the live-stream commands MasterCTRL itself sends are used, nothing that writes to the pump's flash.
+
 ## Requirements
 
 - Windows 11, 64-bit (Windows 10 may work, not tested)
